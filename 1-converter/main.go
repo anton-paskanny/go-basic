@@ -5,14 +5,15 @@ import (
 	"strings"
 )
 
-const (
-	USDToEUR = 0.92
-	USDToRUB = 94.50
-	EURToUSD = 1.09
-	EURToRUB = 102.89
-	RUBToUSD = 0.0106
-	RUBToEUR = 0.0097
-)
+// Exchange rates map where key is "FROM_TO" format and value is the exchange rate
+var exchangeRates = map[string]float64{
+	"USD_EUR": 0.92,
+	"USD_RUB": 94.50,
+	"EUR_USD": 1.09,
+	"EUR_RUB": 102.89,
+	"RUB_USD": 0.0106,
+	"RUB_EUR": 0.0097,
+}
 
 var availableCurrencies = []string{"USD", "EUR", "RUB"}
 
@@ -68,8 +69,8 @@ func readAmount(prompt string) float64 {
 	return value
 }
 
-// convertCurrency is a stub function that will convert from one currency to another
-func convertCurrency(amount float64, from string, to string) float64 {
+// convertCurrency converts from one currency to another using the exchange rates map pointer
+func convertCurrency(amount float64, from string, to string, rates *map[string]float64) float64 {
 	from = strings.ToUpper(from)
 	to = strings.ToUpper(to)
 
@@ -77,23 +78,17 @@ func convertCurrency(amount float64, from string, to string) float64 {
 		return amount
 	}
 
-	switch {
-	case from == "USD" && to == "EUR":
-		return amount * USDToEUR
-	case from == "USD" && to == "RUB":
-		return amount * USDToRUB
-	case from == "EUR" && to == "USD":
-		return amount * EURToUSD
-	case from == "EUR" && to == "RUB":
-		return amount * EURToRUB
-	case from == "RUB" && to == "USD":
-		return amount * RUBToUSD
-	case from == "RUB" && to == "EUR":
-		return amount * RUBToEUR
-	default:
-		fmt.Printf("Error: conversion from %s to %s is not supported", from, to)
-		return 0
+	// Create the key for the exchange rate map
+	rateKey := from + "_" + to
+
+	// Check if the exchange rate exists in the map
+	if rate, exists := (*rates)[rateKey]; exists {
+		return amount * rate
 	}
+
+	// If the direct conversion doesn't exist, show error
+	fmt.Printf("Error: conversion from %s to %s is not supported\n", from, to)
+	return 0
 }
 
 func readCurrency(prompt, excludeCurrency string) string {
@@ -143,6 +138,6 @@ func main() {
 			strings.Join(availableCurrencies, ", "), sourceCurrency),
 		sourceCurrency)
 
-	result := convertCurrency(amount, sourceCurrency, targetCurrency)
+	result := convertCurrency(amount, sourceCurrency, targetCurrency, &exchangeRates)
 	showResult(amount, sourceCurrency, targetCurrency, result)
 }
