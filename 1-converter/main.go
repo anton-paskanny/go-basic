@@ -69,8 +69,8 @@ func readAmount(prompt string) float64 {
 	return value
 }
 
-// convertCurrency converts from one currency to another using the exchange rates map
-func convertCurrency(amount float64, from string, to string) float64 {
+// convertCurrency converts from one currency to another using the exchange rates map pointer
+func convertCurrency(amount float64, from string, to string, rates *map[string]float64) float64 {
 	from = strings.ToUpper(from)
 	to = strings.ToUpper(to)
 
@@ -82,7 +82,7 @@ func convertCurrency(amount float64, from string, to string) float64 {
 	rateKey := from + "_" + to
 
 	// Check if the exchange rate exists in the map
-	if rate, exists := exchangeRates[rateKey]; exists {
+	if rate, exists := (*rates)[rateKey]; exists {
 		return amount * rate
 	}
 
@@ -138,6 +138,6 @@ func main() {
 			strings.Join(availableCurrencies, ", "), sourceCurrency),
 		sourceCurrency)
 
-	result := convertCurrency(amount, sourceCurrency, targetCurrency)
+	result := convertCurrency(amount, sourceCurrency, targetCurrency, &exchangeRates)
 	showResult(amount, sourceCurrency, targetCurrency, result)
 }
