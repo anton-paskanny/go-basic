@@ -7,42 +7,42 @@ import (
 
 // Bin represents a structure for storing bin information
 type Bin struct {
-	id        string
-	private   bool
-	createdAt time.Time
-	name      string
+	ID        string    `json:"id"`
+	Private   bool      `json:"private"`
+	CreatedAt time.Time `json:"created_at"`
+	Name      string    `json:"name"`
 }
 
 // BinList represents a list of Bin
 type BinList struct {
-	bins []Bin
+	Bins []Bin `json:"bins"`
 }
 
 // NewBin creates a new instance of Bin
 func NewBin(id, name string, private bool) *Bin {
 	return &Bin{
-		id:        id,
-		private:   private,
-		createdAt: time.Now(),
-		name:      name,
+		ID:        id,
+		Private:   private,
+		CreatedAt: time.Now(),
+		Name:      name,
 	}
 }
 
 // NewList creates a new instance of BinList
 func NewList() *BinList {
-	return &BinList{bins: make([]Bin, 0)}
+	return &BinList{Bins: make([]Bin, 0)}
 }
 
 // Add adds a bin to the list
 func (bl *BinList) Add(bin Bin) {
-	bl.bins = append(bl.bins, bin)
+	bl.Bins = append(bl.Bins, bin)
 }
 
 // GetByID returns a bin by ID
 func (bl *BinList) GetByID(id string) (*Bin, bool) {
-	for i := range bl.bins {
-		if bl.bins[i].id == id {
-			return &bl.bins[i], true
+	for i := range bl.Bins {
+		if bl.Bins[i].ID == id {
+			return &bl.Bins[i], true
 		}
 	}
 	return nil, false
@@ -51,20 +51,8 @@ func (bl *BinList) GetByID(id string) (*Bin, bool) {
 // PrintAll prints all bins to console
 func (bl *BinList) PrintAll() {
 	fmt.Println("List of all bins:")
-	for i, bin := range bl.bins {
+	for i, bin := range bl.Bins {
 		fmt.Printf("%d. ID: %s, Name: %s, Private: %t, Created: %s\n",
-			i+1, bin.id, bin.name, bin.private, bin.createdAt.Format("2006-01-02 15:04:05"))
+			i+1, bin.ID, bin.Name, bin.Private, bin.CreatedAt.Format("2006-01-02 15:04:05"))
 	}
 }
-
-// ID returns bin id
-func (b *Bin) ID() string { return b.id }
-
-// Name returns bin name
-func (b *Bin) Name() string { return b.name }
-
-// Private returns whether bin is private
-func (b *Bin) Private() bool { return b.private }
-
-// CreatedAt returns creation time
-func (b *Bin) CreatedAt() time.Time { return b.createdAt }
