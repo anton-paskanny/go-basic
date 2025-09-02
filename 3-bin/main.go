@@ -2,6 +2,7 @@ package main
 
 import (
 	b "demo/bin/bins"
+	f "demo/bin/file"
 	s "demo/bin/storage"
 	"fmt"
 	"log"
@@ -25,8 +26,9 @@ func main() {
 	fmt.Println("=== Original bin list ===")
 	binList.PrintAll()
 
-	// Create storage instance
-	storage := s.New("data/bins.json")
+	// Create storage instance via DI
+	fs := f.NewFS()
+	var storage s.Store = s.New(fs, "data/bins.json")
 
 	// Save bins to JSON file
 	fmt.Println("\n=== Saving bins to JSON ===")

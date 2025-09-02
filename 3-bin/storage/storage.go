@@ -3,8 +3,6 @@ package storage
 import (
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"demo/bin/bins"
@@ -12,17 +10,31 @@ import (
 
 const defaultStorageFile = "bins.json"
 
+// FileIO defines minimal file operations for DI
+type FileIO interface {
+	Read(path string) ([]byte, error)
+	Write(path string, data []byte) error
+}
+
+// Store defines the persistence contract
+type Store interface {
+	SaveBins(binList *bins.BinList) error
+	LoadBins() (*bins.BinList, error)
+	GetStoragePath() string
+}
+
 // Storage handles persistence of bins to/from JSON files
 type Storage struct {
+	fileIO   FileIO
 	filePath string
 }
 
-// New creates a new storage instance
-func New(filePath string) *Storage {
+// New creates a new storage instance with injected FileIO
+func New(fileIO FileIO, filePath string) *Storage {
 	if filePath == "" {
 		filePath = defaultStorageFile
 	}
-	return &Storage{filePath: filePath}
+	return &Storage{fileIO: fileIO, filePath: filePath}
 }
 
 // SaveBins saves the bin list to a JSON file
@@ -31,14 +43,10 @@ func (s *Storage) SaveBins(binList *bins.BinList) error {
 	if err != nil {
 		return fmt.Errorf("failed to marshal bins to JSON: %w", err)
 	}
-
-	// Ensure directory exists
-	dir := filepath.Dir(s.filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	if s.fileIO == nil {
+		return fmt.Errorf("fileIO is not initialized")
 	}
-
-	if err := os.WriteFile(s.filePath, data, 0644); err != nil {
+	if err := s.fileIO.Write(s.filePath, data); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", s.filePath, err)
 	}
 
@@ -47,13 +55,13 @@ func (s *Storage) SaveBins(binList *bins.BinList) error {
 
 // LoadBins loads the bin list from a JSON file
 func (s *Storage) LoadBins() (*bins.BinList, error) {
-	data, err := os.ReadFile(s.filePath)
+	if s.fileIO == nil {
+		return nil, fmt.Errorf("fileIO is not initialized")
+	}
+	data, err := s.fileIO.Read(s.filePath)
 	if err != nil {
-		if os.IsNotExist(err) {
-			// Return empty list if file doesn't exist
-			return bins.NewList(), nil
-		}
-		return nil, fmt.Errorf("failed to read file %s: %w", s.filePath, err)
+		// Return empty list if file doesn't exist or cannot be read
+		return bins.NewList(), nil
 	}
 
 	var binList bins.BinList

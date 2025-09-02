@@ -57,3 +57,15 @@ func ReadJSONFile(path string) ([]byte, error) {
 
 	return ReadAll(path)
 }
+
+// FS is a minimal file adapter used for DI
+type FS struct{}
+
+// NewFS creates a new file adapter
+func NewFS() *FS { return &FS{} }
+
+// Read reads all bytes from the given path
+func (f *FS) Read(path string) ([]byte, error) { return ReadAll(path) }
+
+// Write writes bytes to the given path
+func (f *FS) Write(path string, data []byte) error { return WriteAll(path, data) }
