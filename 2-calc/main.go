@@ -7,22 +7,34 @@ import (
 	"strings"
 )
 
-var supportedOperations = []string{"AVG", "SUM", "MED"}
+var operations = map[string]struct {
+	calc  func([]float64) float64
+	label string
+}{
+	"SUM": {calc: calculateSum, label: "Sum"},
+	"AVG": {calc: calculateAverage, label: "Arithmetic mean"},
+	"MED": {calc: calculateMedian, label: "Median"},
+}
+
+func operationKeys() []string {
+	keys := make([]string, 0, len(operations))
+	for k := range operations {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
+}
 
 func isValidOperation(operation string) bool {
 	operation = strings.ToUpper(operation)
-	for _, op := range supportedOperations {
-		if op == operation {
-			return true
-		}
-	}
-	return false
+	_, ok := operations[operation]
+	return ok
 }
 
 func readOperation() string {
 	var operation string
 	for {
-		fmt.Printf("Enter operation (%s): ", strings.Join(supportedOperations, ", "))
+		fmt.Printf("Enter operation (%s): ", strings.Join(operationKeys(), ", "))
 		fmt.Scanln(&operation)
 
 		operation = strings.ToUpper(strings.TrimSpace(operation))
@@ -32,7 +44,7 @@ func readOperation() string {
 		}
 
 		fmt.Printf("Error: operation '%s' is not supported. Available operations: %s\n",
-			operation, strings.Join(supportedOperations, ", "))
+			operation, strings.Join(operationKeys(), ", "))
 	}
 }
 
@@ -117,18 +129,7 @@ func calculateMedian(numbers []float64) float64 {
 	}
 }
 
-func performCalculation(operation string, numbers []float64) float64 {
-	switch operation {
-	case "SUM":
-		return calculateSum(numbers)
-	case "AVG":
-		return calculateAverage(numbers)
-	case "MED":
-		return calculateMedian(numbers)
-	default:
-		return 0
-	}
-}
+// map-based dispatch replaces performCalculation
 
 func formatNumbers(numbers []float64) string {
 	strNumbers := make([]string, len(numbers))
@@ -174,20 +175,13 @@ func main() {
 
 		numbers := readNumbers()
 
-		result := performCalculation(operation, numbers)
+		result := operations[operation].calc(numbers)
 
 		fmt.Println("\n=== RESULT ===")
 		fmt.Printf("Operation: %s\n", operation)
 		fmt.Printf("Numbers: %s\n", formatNumbers(numbers))
 
-		switch operation {
-		case "SUM":
-			fmt.Printf("Sum: %s\n", formatResult(result))
-		case "AVG":
-			fmt.Printf("Arithmetic mean: %s\n", formatResult(result))
-		case "MED":
-			fmt.Printf("Median: %s\n", formatResult(result))
-		}
+		fmt.Printf("%s: %s\n", operations[operation].label, formatResult(result))
 
 		fmt.Printf("Number count: %d\n", len(numbers))
 
