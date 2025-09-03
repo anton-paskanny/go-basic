@@ -1,7 +1,9 @@
 package main
 
 import (
+	"demo/bin/api"
 	b "demo/bin/bins"
+	"demo/bin/config"
 	f "demo/bin/file"
 	s "demo/bin/storage"
 	"fmt"
@@ -9,6 +11,13 @@ import (
 )
 
 func main() {
+	// Load configuration
+	cfg := config.Load()
+
+	// Create API client with configuration
+	apiClient := api.New(cfg)
+	_ = apiClient // TODO: use API client when methods are implemented
+
 	// Create a new list
 	binList := b.NewList()
 
