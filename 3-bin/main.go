@@ -1,64 +1,88 @@
 package main
 
 import (
-	"demo/bin/api"
-	b "demo/bin/bins"
-	"demo/bin/config"
-	f "demo/bin/file"
-	s "demo/bin/storage"
+	"flag"
 	"fmt"
 	"log"
+
+	"demo/bin/api"
+	"demo/bin/config"
+	f "demo/bin/file"
 )
 
 func main() {
-	// Load configuration
+	// Flags
+	opCreate := flag.Bool("create", false, "Create a new bin from JSON file")
+	opGet := flag.Bool("get", false, "Get a bin by id")
+	opUpdate := flag.Bool("update", false, "Update a bin by id with JSON file")
+	id := flag.String("id", "", "Bin id for get/update")
+	filePath := flag.String("file", "", "Path to JSON file for create/update")
+	isPrivate := flag.Bool("private", false, "Create bin as private")
+	flag.Parse()
+
+	// Ensure exactly one operation
+	ops := 0
+	if *opCreate {
+		ops++
+	}
+	if *opGet {
+		ops++
+	}
+	if *opUpdate {
+		ops++
+	}
+	if ops != 1 {
+		fmt.Println("Usage:")
+		fmt.Println("  -create -file path [-private]")
+		fmt.Println("  -get -id BIN_ID")
+		fmt.Println("  -update -id BIN_ID -file path")
+		flag.PrintDefaults()
+		return
+	}
+
+	// Load configuration and init API client
 	cfg := config.Load()
-
-	// Create API client with configuration
 	apiClient := api.New(cfg)
-	_ = apiClient // TODO: use API client when methods are implemented
 
-	// Create a new list
-	binList := b.NewList()
+	switch {
+	case *opCreate:
+		if *filePath == "" {
+			log.Fatal("-file is required for -create")
+		}
+		data, err := f.ReadJSONFile(*filePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		newID, err := apiClient.CreateBin(data, *isPrivate)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Printf("Created bin id: %s\n", newID)
 
-	// Create several example bins
-	bin1 := b.NewBin("bin001", "My first bin", false)
-	bin2 := b.NewBin("bin002", "Private bin", true)
-	bin3 := b.NewBin("bin003", "Work bin", false)
+	case *opGet:
+		if *id == "" {
+			log.Fatal("-id is required for -get")
+		}
+		data, err := apiClient.GetBin(*id)
+		if err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println(string(data))
 
-	// Add bins to the list
-	binList.Add(*bin1)
-	binList.Add(*bin2)
-	binList.Add(*bin3)
-
-	// Print all bins
-	fmt.Println("=== Original bin list ===")
-	binList.PrintAll()
-
-	// Create storage instance via DI
-	fs := f.NewFS()
-	var storage s.Store = s.New(fs, "data/bins.json")
-
-	// Save bins to JSON file
-	fmt.Println("\n=== Saving bins to JSON ===")
-	if err := storage.SaveBins(binList); err != nil {
-		log.Printf("Error saving bins: %v", err)
-	} else {
-		fmt.Printf("Bins saved to: %s\n", storage.GetStoragePath())
-	}
-
-	// Load bins from JSON file
-	fmt.Println("\n=== Loading bins from JSON ===")
-	loadedBinList, err := storage.LoadBins()
-	if err != nil {
-		log.Printf("Error loading bins: %v", err)
-	} else {
-		fmt.Println("Loaded bins from storage:")
-		loadedBinList.PrintAll()
-	}
-
-	// Example of searching for a bin by ID
-	if foundBin, exists := binList.GetByID("bin002"); exists {
-		fmt.Printf("\nFound bin: %s (Private: %t)\n", foundBin.Name, foundBin.Private)
+	case *opUpdate:
+		if *id == "" {
+			log.Fatal("-id is required for -update")
+		}
+		if *filePath == "" {
+			log.Fatal("-file is required for -update")
+		}
+		data, err := f.ReadJSONFile(*filePath)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err := apiClient.UpdateBin(*id, data); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Updated")
 	}
 }
