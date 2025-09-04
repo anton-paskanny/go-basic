@@ -16,6 +16,7 @@ type Client interface {
 	CreateBin(payload []byte, isPrivate bool) (string, error)
 	GetBin(id string) ([]byte, error)
 	UpdateBin(id string, payload []byte) error
+	DeleteBin(id string) error
 }
 
 // client implements the Client interface
@@ -117,6 +118,27 @@ func (c *client) UpdateBin(id string, payload []byte) error {
 		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set(headerMasterKey, c.apiKey)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("do request: %w", err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
+	}
+	return nil
+}
+
+// DeleteBin removes a bin by id
+func (c *client) DeleteBin(id string) error {
+	url := baseURL + "/b/" + id
+	req, err := http.NewRequest(http.MethodDelete, url, nil)
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
 	req.Header.Set(headerMasterKey, c.apiKey)
 
 	resp, err := c.httpClient.Do(req)

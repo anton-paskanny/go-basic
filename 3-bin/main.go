@@ -15,6 +15,7 @@ func main() {
 	opCreate := flag.Bool("create", false, "Create a new bin from JSON file")
 	opGet := flag.Bool("get", false, "Get a bin by id")
 	opUpdate := flag.Bool("update", false, "Update a bin by id with JSON file")
+	opDelete := flag.Bool("delete", false, "Delete a bin by id")
 	id := flag.String("id", "", "Bin id for get/update")
 	filePath := flag.String("file", "", "Path to JSON file for create/update")
 	isPrivate := flag.Bool("private", false, "Create bin as private")
@@ -31,11 +32,15 @@ func main() {
 	if *opUpdate {
 		ops++
 	}
+	if *opDelete {
+		ops++
+	}
 	if ops != 1 {
 		fmt.Println("Usage:")
 		fmt.Println("  -create -file path [-private]")
 		fmt.Println("  -get -id BIN_ID")
 		fmt.Println("  -update -id BIN_ID -file path")
+		fmt.Println("  -delete -id BIN_ID")
 		flag.PrintDefaults()
 		return
 	}
@@ -84,5 +89,14 @@ func main() {
 			log.Fatal(err)
 		}
 		fmt.Println("Updated")
+
+	case *opDelete:
+		if *id == "" {
+			log.Fatal("-id is required for -delete")
+		}
+		if err := apiClient.DeleteBin(*id); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("Deleted")
 	}
 }
