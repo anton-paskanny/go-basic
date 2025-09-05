@@ -1,91 +1,62 @@
-# Bin Storage System
+# Bin CLI with JSONBin
 
-This project demonstrates a simple bin storage system with JSON persistence and file validation capabilities.
+This module provides a minimal CLI to create, fetch, and update JSON documents ("bins") using JSONBin v3, plus utilities for working with local JSON files.
 
-## Features
+## Prerequisites
+- Go 1.20+
+- JSONBin account and Master Key (v3)
 
-### Storage Package (`storage/`)
-- **SaveBins**: Saves bin list to JSON file with automatic directory creation
-- **LoadBins**: Loads bin list from JSON file, returns empty list if file doesn't exist
-- **IsJSONFile**: Checks if a file has a JSON extension
-- **GetStoragePath**: Returns the current storage file path
-
-### File Package (`file/`)
-- **ReadAll**: Reads entire file contents
-- **WriteAll**: Writes data to file with automatic directory creation
-- **IsJSONFile**: Checks if a file has a JSON extension
-- **ValidateJSONFile**: Validates that a file has .json extension and contains valid JSON
-- **ReadJSONFile**: Reads and validates a JSON file
-
-### Bins Package (`bins/`)
-- **Bin**: Structure for storing bin information (ID, Name, Private, CreatedAt)
-- **BinList**: Container for managing multiple bins
-- **JSON Support**: All structures support JSON marshaling/unmarshaling
-
-## Usage
-
-### Running the Program
+## Setup
+1. Create `.env` in `3-bin/` with your Master Key. Use single quotes to preserve `$`:
 ```bash
-go run .
+KEY='$2a$10$xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx'
+```
+2. Load env when running locally:
+```bash
+set -a && source .env && set +a
 ```
 
-This will:
-1. Create sample bins
-2. Save them to `data/bins.json`
-3. Load them back from the file
-4. Display the results
+## CLI
+Flags:
+- `-create` Create a new bin from a JSON file. Optional: `-private` to make it private
+- `-get`    Get a bin by id
+- `-update` Update a bin by id from a JSON file
+- `-id`     Bin id for get/update
+- `-file`   Path to JSON file for create/update
 
-### Example Output
-The program creates a JSON file like:
-```json
-{
-  "bins": [
-    {
-      "id": "bin001",
-      "private": false,
-      "created_at": "2025-08-30T09:11:21.468721+02:00",
-      "name": "My first bin"
-    }
-  ]
-}
+Examples:
+```bash
+# Create a private bin from local JSON
+go run . -create -file ./data/bins.json -private
+
+# Fetch a bin by id
+go run . -get -id <BIN_ID>
+
+# Update a bin from local JSON
+go run . -update -id <BIN_ID> -file ./data/bins.json
 ```
 
-### File Validation
-```go
-import "demo/bin/file"
+## Data
+Sample payload lives at `data/bins.json`.
+The CLI validates that files passed via `-file` are valid JSON before sending.
 
-// Check if file has JSON extension
-if file.IsJSONFile("data.json") {
-    // File is a JSON file
-}
-
-// Validate JSON file (checks extension and content)
-err := file.ValidateJSONFile("data.json")
-if err != nil {
-    // File is not valid JSON
-}
-```
-
-### Storage Operations
-```go
-import "demo/bin/storage"
-
-// Create storage instance
-storage := storage.New("my_bins.json")
-
-// Save bins
-err := storage.SaveBins(binList)
-
-// Load bins
-loadedBins, err := storage.LoadBins()
-```
+## Configuration
+- Env var: `KEY` (required) – JSONBin Master Key
+- API base: `https://api.jsonbin.io/v3`
+- Headers: `X-Master-Key`, `X-Bin-Private`
 
 ## Project Structure
 ```
 3-bin/
-├── bins/          # Bin data structures
-├── storage/       # JSON persistence
-├── file/          # File operations and validation
-├── main.go        # Main program
-└── README.md      # This file
+├── api/           # JSONBin client (POST/GET/PUT)
+├── bins/          # Local data structures (example)
+├── config/        # Env loader for KEY
+├── data/          # Example JSON payloads
+├── file/          # File helpers and JSON validation
+├── storage/       # Local JSON persistence (example)
+├── main.go        # CLI entrypoint
+└── README.md
 ```
+
+## Reference
+- JSONBin overview: https://jsonbin.io/
