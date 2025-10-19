@@ -7,9 +7,16 @@ import (
 
 	"validation-api/config"
 	"validation-api/verify"
+
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	// Load environment variables from .env file
+	if err := godotenv.Load(); err != nil {
+		log.Println("Warning: No .env file found or error loading it")
+	}
+
 	// Initialize configuration from environment variables
 	cfg := config.NewConfig()
 

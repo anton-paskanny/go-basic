@@ -36,6 +36,11 @@ func NewService(cfg *config.Config) *Service {
 
 // SendVerificationEmail sends a verification email and returns the verification hash
 func (s *Service) SendVerificationEmail(emailAddr string) (string, error) {
+	// Validate email format
+	if err := validateEmail(emailAddr); err != nil {
+		return "", err
+	}
+
 	// Generate random verification hash
 	hashBytes := make([]byte, 16)
 	if _, err := rand.Read(hashBytes); err != nil {

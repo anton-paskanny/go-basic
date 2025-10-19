@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"validation-api/config"
 )
@@ -51,7 +52,25 @@ func (h *Handler) SendHandler(w http.ResponseWriter, r *http.Request) {
 
 	_, err := h.service.SendVerificationEmail(req.Email)
 	if err != nil {
-		http.Error(w, fmt.Sprintf("Failed to send verification email: %v", err), http.StatusInternalServerError)
+		statusCode := http.StatusInternalServerError
+
+		// Check for validation errors
+		if err.Error() == ErrInvalidEmailFormat || err.Error() == ErrEmptyEmail ||
+			strings.Contains(err.Error(), ErrInvalidEmailFormat) {
+			statusCode = http.StatusBadRequest
+
+			resp := SendResponse{
+				Success: false,
+				Message: fmt.Sprintf("Email validation failed: %v", err),
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(statusCode)
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
+		http.Error(w, fmt.Sprintf("Failed to send verification email: %v", err), statusCode)
 		return
 	}
 

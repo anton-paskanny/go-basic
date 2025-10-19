@@ -46,6 +46,8 @@ Response: HTML page confirming verification
 
 ## Running the Application
 
+### Using Environment Variables Directly
+
 ```bash
 # Set environment variables
 export EMAIL_ADDRESS=your-email@example.com
@@ -57,3 +59,21 @@ export SERVER_ADDRESS=:8080
 # Run the application
 go run main.go
 ```
+
+### Using .env File
+
+The application automatically loads environment variables from a `.env` file if present.
+
+1. Copy the example environment file:
+```bash
+cp env.example .env
+```
+
+2. Edit the `.env` file with your configuration values
+
+3. Run the application:
+```bash
+go run main.go
+```
+
+The application will automatically load the environment variables from the `.env` file using the godotenv package.
