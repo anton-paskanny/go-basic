@@ -1,5 +1,10 @@
 package config
 
+import (
+	"os"
+	"strconv"
+)
+
 // Config holds application configuration
 type Config struct {
 	Email  EmailConfig
@@ -23,11 +28,37 @@ type ServerConfig struct {
 func NewConfig() *Config {
 	return &Config{
 		Email: EmailConfig{
-			Host: "smtp.example.com",
-			Port: 587,
+			Address:  getEnv("EMAIL_ADDRESS", ""),
+			Password: getEnv("EMAIL_PASSWORD", ""),
+			Host:     getEnv("EMAIL_HOST", "smtp.example.com"),
+			Port:     getEnvAsInt("EMAIL_PORT", 587),
 		},
 		Server: ServerConfig{
-			Address: ":8080",
+			Address: getEnv("SERVER_ADDRESS", ":8080"),
 		},
 	}
+}
+
+// getEnv gets an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	value := os.Getenv(key)
+	if value == "" {
+		return defaultValue
+	}
+	return value
+}
+
+// getEnvAsInt gets an environment variable as an integer or returns a default value
+func getEnvAsInt(key string, defaultValue int) int {
+	valueStr := os.Getenv(key)
+	if valueStr == "" {
+		return defaultValue
+	}
+
+	value, err := strconv.Atoi(valueStr)
+	if err != nil {
+		return defaultValue
+	}
+
+	return value
 }
