@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"fmt"
+	"log"
 	"net/smtp"
 	"sync"
 	"time"
@@ -15,22 +16,24 @@ import (
 
 // Service handles email verification logic
 type Service struct {
-	cfg           *config.Config
-	verifications map[string]verificationData
-	mu            sync.RWMutex
-}
-
-type verificationData struct {
-	email     string
-	createdAt time.Time
-	verified  bool
+	cfg     *config.Config
+	storage *VerificationStorage
+	mu      sync.RWMutex
 }
 
 // NewService creates a new verification service
 func NewService(cfg *config.Config) *Service {
+	// Create storage with default path
+	storage := NewVerificationStorage("")
+
+	// Load existing verification data
+	if err := storage.Load(); err != nil {
+		log.Printf("Warning: Failed to load verification data: %v", err)
+	}
+
 	return &Service{
-		cfg:           cfg,
-		verifications: make(map[string]verificationData),
+		cfg:     cfg,
+		storage: storage,
 	}
 }
 
@@ -50,10 +53,15 @@ func (s *Service) SendVerificationEmail(emailAddr string) (string, error) {
 
 	// Store verification data
 	s.mu.Lock()
-	s.verifications[hash] = verificationData{
-		email:     emailAddr,
-		createdAt: time.Now(),
-		verified:  false,
+	s.storage.Set(hash, StorableVerificationData{
+		Email:     emailAddr,
+		CreatedAt: time.Now(),
+		Verified:  false,
+	})
+
+	// Save to JSON file
+	if err := s.storage.Save(); err != nil {
+		log.Printf("Warning: Failed to save verification data: %v", err)
 	}
 	s.mu.Unlock()
 
@@ -90,20 +98,28 @@ func (s *Service) VerifyEmail(hash string) (string, bool) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	data, exists := s.verifications[hash]
+	data, exists := s.storage.Get(hash)
 	if !exists {
 		return "", false
 	}
 
 	// Check if verification has expired (24 hours)
-	if time.Since(data.createdAt) > 24*time.Hour {
-		delete(s.verifications, hash)
+	if time.Since(data.CreatedAt) > 24*time.Hour {
+		s.storage.Delete(hash)
+		if err := s.storage.Save(); err != nil {
+			log.Printf("Warning: Failed to save verification data after expiration: %v", err)
+		}
 		return "", false
 	}
 
-	// Mark as verified
-	data.verified = true
-	s.verifications[hash] = data
+	// Get email before deleting
+	email := data.Email
 
-	return data.email, true
+	// Delete the record after successful verification
+	s.storage.Delete(hash)
+	if err := s.storage.Save(); err != nil {
+		log.Printf("Warning: Failed to save verification data after verification: %v", err)
+	}
+
+	return email, true
 }

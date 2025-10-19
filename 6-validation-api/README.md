@@ -1,6 +1,6 @@
 # Email Verification API
 
-A simple API for email verification with environment-based configuration.
+A simple API for email verification with environment-based configuration and persistent JSON storage.
 
 ## Configuration
 
@@ -77,3 +77,11 @@ go run main.go
 ```
 
 The application will automatically load the environment variables from the `.env` file using the godotenv package.
+
+## Data Storage
+
+Verification data is stored in a JSON file at `data/verification_data.json`. This ensures that verification data persists between application restarts. The data is automatically:
+
+- Loaded when the application starts
+- Saved when new verification emails are sent
+- Deleted after successful verification or when expired
