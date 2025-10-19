@@ -85,3 +85,11 @@ Verification data is stored in a JSON file at `data/verification_data.json`. Thi
 - Loaded when the application starts
 - Saved when new verification emails are sent
 - Deleted after successful verification or when expired
+
+## Error Handling
+
+The application includes robust error handling for various scenarios:
+
+- **Email Validation Errors**: Returns descriptive error messages for invalid email formats
+- **SMTP Server Issues**: Gracefully handles cases when the SMTP server is unavailable or times out
+- **Verification Expiration**: Automatically cleans up expired verification records

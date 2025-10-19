@@ -70,6 +70,20 @@ func (h *Handler) SendHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
+		// Check for SMTP errors
+		if strings.Contains(err.Error(), "failed to send email") ||
+			strings.Contains(err.Error(), "timeout connecting to SMTP server") {
+			resp := SendResponse{
+				Success: false,
+				Message: "Email service is currently unavailable. Please try again later.",
+			}
+
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusServiceUnavailable)
+			json.NewEncoder(w).Encode(resp)
+			return
+		}
+
 		http.Error(w, fmt.Sprintf("Failed to send verification email: %v", err), statusCode)
 		return
 	}

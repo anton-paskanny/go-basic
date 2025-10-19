@@ -82,11 +82,35 @@ func (s *Service) SendVerificationEmail(emailAddr string) (string, error) {
 
 	// Send email
 	auth := smtp.PlainAuth("", s.cfg.Email.Address, s.cfg.Email.Password, s.cfg.Email.Host)
-	err := e.Send(
-		fmt.Sprintf("%s:%d", s.cfg.Email.Host, s.cfg.Email.Port),
-		auth,
-	)
-	if err != nil {
+
+	// Set up SMTP server address
+	smtpServer := fmt.Sprintf("%s:%d", s.cfg.Email.Host, s.cfg.Email.Port)
+
+	// Try to send the email with timeout and error handling
+	emailSent := false
+	var err error
+
+	// Create a channel to handle timeout
+	done := make(chan error, 1)
+
+	// Try to send the email in a separate goroutine
+	go func() {
+		sendErr := e.Send(smtpServer, auth)
+		done <- sendErr
+	}()
+
+	// Wait for the email to be sent or timeout
+	select {
+	case err = <-done:
+		if err == nil {
+			emailSent = true
+		}
+	case <-time.After(10 * time.Second):
+		err = fmt.Errorf("timeout connecting to SMTP server %s", smtpServer)
+	}
+
+	if !emailSent {
+		log.Printf("SMTP Error: Failed to send verification email: %v", err)
 		return "", fmt.Errorf("failed to send email: %w", err)
 	}
 
