@@ -3,6 +3,7 @@ package models
 import (
 	"time"
 
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
@@ -15,6 +16,7 @@ type Product struct {
 	Quantity    int            `json:"quantity" gorm:"not null;default:0" validate:"min=0"`
 	Category    string         `json:"category" gorm:"size:100" validate:"omitempty,max=100"`
 	SKU         string         `json:"sku" gorm:"size:50;uniqueIndex" validate:"required,min=3,max=50"`
+	Images      pq.StringArray `json:"images" gorm:"type:text[]"`
 	CreatedAt   time.Time      `json:"created_at"`
 	UpdatedAt   time.Time      `json:"updated_at"`
 	DeletedAt   gorm.DeletedAt `json:"deleted_at,omitempty" gorm:"index"`
