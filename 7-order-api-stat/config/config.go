@@ -3,30 +3,31 @@ package config
 import (
 	"fmt"
 	"log"
+	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
-	"github.com/spf13/viper"
 )
 
 // Config holds all configuration for the application
 type Config struct {
-	Server   ServerConfig   `mapstructure:"server"`
-	Database DatabaseConfig `mapstructure:"database"`
+	Server   ServerConfig
+	Database DatabaseConfig
 }
 
 // ServerConfig holds server configuration
 type ServerConfig struct {
-	Port int `mapstructure:"port"`
+	Port int
 }
 
 // DatabaseConfig holds database configuration
 type DatabaseConfig struct {
-	Host     string `mapstructure:"host"`
-	Port     int    `mapstructure:"port"`
-	User     string `mapstructure:"user"`
-	Password string `mapstructure:"password"`
-	DBName   string `mapstructure:"dbname"`
-	SSLMode  string `mapstructure:"sslmode"`
+	Host     string
+	Port     int
+	User     string
+	Password string
+	DBName   string
+	SSLMode  string
 }
 
 // GetDSN returns database connection string
@@ -35,7 +36,25 @@ func (d *DatabaseConfig) GetDSN() string {
 		d.Host, d.Port, d.User, d.Password, d.DBName, d.SSLMode)
 }
 
-// LoadConfig loads configuration from file and environment variables
+// getEnvWithDefault gets an environment variable with a default value
+func getEnvWithDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+// getEnvIntWithDefault gets an environment variable as int with a default value
+func getEnvIntWithDefault(key string, defaultValue int) int {
+	if value := os.Getenv(key); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil {
+			return intValue
+		}
+	}
+	return defaultValue
+}
+
+// LoadConfig loads configuration from environment variables
 func LoadConfig(path string) (*Config, error) {
 	// Load .env file if it exists
 	if err := godotenv.Load(); err != nil {
@@ -44,46 +63,19 @@ func LoadConfig(path string) (*Config, error) {
 		log.Println("Loaded configuration from .env file")
 	}
 
-	// Setup viper
-	viper.AddConfigPath(path)
-	viper.SetConfigName("config")
-	viper.SetConfigType("yaml")
-
-	// Enable viper to read environment variables
-	viper.AutomaticEnv()
-	viper.SetEnvPrefix("APP") // will be uppercased automatically
-
-	// Map environment variables to config keys
-	viper.BindEnv("server.port", "APP_SERVER_PORT")
-	viper.BindEnv("database.host", "APP_DB_HOST")
-	viper.BindEnv("database.port", "APP_DB_PORT")
-	viper.BindEnv("database.user", "APP_DB_USER")
-	viper.BindEnv("database.password", "APP_DB_PASSWORD")
-	viper.BindEnv("database.dbname", "APP_DB_NAME")
-	viper.BindEnv("database.sslmode", "APP_DB_SSLMODE")
-
-	// Set default values
-	viper.SetDefault("server.port", 8080)
-	viper.SetDefault("database.host", "localhost")
-	viper.SetDefault("database.port", 5432)
-	viper.SetDefault("database.user", "postgres")
-	viper.SetDefault("database.password", "postgres")
-	viper.SetDefault("database.dbname", "order_api")
-	viper.SetDefault("database.sslmode", "disable")
-
-	// Try to read config file, but don't return error if not found
-	if err := viper.ReadInConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			log.Println("Config file not found, using environment variables and defaults")
-		} else {
-			return nil, fmt.Errorf("error reading config file: %w", err)
-		}
+	config := &Config{
+		Server: ServerConfig{
+			Port: getEnvIntWithDefault("APP_SERVER_PORT", 8080),
+		},
+		Database: DatabaseConfig{
+			Host:     getEnvWithDefault("APP_DB_HOST", "localhost"),
+			Port:     getEnvIntWithDefault("APP_DB_PORT", 5432),
+			User:     getEnvWithDefault("APP_DB_USER", "postgres"),
+			Password: getEnvWithDefault("APP_DB_PASSWORD", "postgres"),
+			DBName:   getEnvWithDefault("APP_DB_NAME", "order_api"),
+			SSLMode:  getEnvWithDefault("APP_DB_SSLMODE", "disable"),
+		},
 	}
 
-	var config Config
-	if err := viper.Unmarshal(&config); err != nil {
-		return nil, fmt.Errorf("unable to decode config into struct: %w", err)
-	}
-
-	return &config, nil
+	return config, nil
 }

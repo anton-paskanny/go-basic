@@ -7,6 +7,8 @@ import (
 
 	"order-api-stat/config"
 	"order-api-stat/database"
+	"order-api-stat/handlers"
+	"order-api-stat/utils"
 	"order-api-stat/validation"
 )
 
@@ -32,11 +34,35 @@ func main() {
 	validator := validation.New()
 	_ = validator // Use validator in handlers
 
+	// Initialize handlers
+	productHandler := handlers.NewProductHandler()
+	healthHandler := handlers.NewHealthHandler()
+
+	// Setup routes
+	mux := http.NewServeMux()
+
+	// Product routes
+	mux.HandleFunc("/products", productHandler.HandleProducts)
+	mux.HandleFunc("/products/", productHandler.HandleProductByID)
+
+	// Health check endpoint
+	mux.HandleFunc("/health", healthHandler.HandleHealth)
+
+	// Add CORS middleware
+	handler := utils.CORSMiddleware(mux)
+
 	// Start HTTP server
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
 	log.Printf("Server starting on port %d", cfg.Server.Port)
+	log.Printf("Available endpoints:")
+	log.Printf("  POST   /products     - Create a new product")
+	log.Printf("  GET    /products      - List products (with pagination)")
+	log.Printf("  GET    /products/{id} - Get a specific product")
+	log.Printf("  PUT    /products/{id} - Update a product")
+	log.Printf("  DELETE /products/{id} - Delete a product")
+	log.Printf("  GET    /health        - Health check")
 
-	if err := http.ListenAndServe(addr, nil); err != nil {
+	if err := http.ListenAndServe(addr, handler); err != nil {
 		log.Fatalf("Server failed to start: %v", err)
 	}
 }
