@@ -1,8 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"order-api-stat/config"
 	"order-api-stat/database"
@@ -56,18 +61,46 @@ func main() {
 	// Add middleware chain: logging -> CORS
 	handler := utils.LoggingMiddleware(utils.CORSMiddleware(mux))
 
-	// Start HTTP server
+	// Create HTTP server with timeouts
 	addr := fmt.Sprintf(":%d", cfg.Server.Port)
-	logrus.WithField("port", cfg.Server.Port).Info("Server starting")
-	logrus.Info("Available endpoints:")
-	logrus.Info("  POST   /products     - Create a new product")
-	logrus.Info("  GET    /products      - List products (with pagination)")
-	logrus.Info("  GET    /products/{id} - Get a specific product")
-	logrus.Info("  PUT    /products/{id} - Update a product")
-	logrus.Info("  DELETE /products/{id} - Delete a product")
-	logrus.Info("  GET    /health        - Health check")
+	server := &http.Server{
+		Addr:         addr,
+		Handler:      handler,
+		ReadTimeout:  15 * time.Second,
+		WriteTimeout: 15 * time.Second,
+		IdleTimeout:  60 * time.Second,
+	}
 
-	if err := http.ListenAndServe(addr, handler); err != nil {
-		logrus.Fatalf("Server failed to start: %v", err)
+	// Start server in a goroutine
+	go func() {
+		logrus.WithField("port", cfg.Server.Port).Info("Server starting")
+		logrus.Info("Available endpoints:")
+		logrus.Info("  POST   /products     - Create a new product")
+		logrus.Info("  GET    /products      - List products (with pagination)")
+		logrus.Info("  GET    /products/{id} - Get a specific product")
+		logrus.Info("  PUT    /products/{id} - Update a product")
+		logrus.Info("  DELETE /products/{id} - Delete a product")
+		logrus.Info("  GET    /health        - Health check")
+
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			logrus.Fatalf("Server failed to start: %v", err)
+		}
+	}()
+
+	// Wait for interrupt signal to gracefully shutdown the server
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+	<-quit
+	logrus.Info("Server shutting down...")
+
+	// Create a deadline to wait for
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := server.Shutdown(ctx); err != nil {
+		logrus.Errorf("Server forced to shutdown: %v", err)
+	} else {
+		logrus.Info("Server exited gracefully")
 	}
 }
