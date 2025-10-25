@@ -28,9 +28,11 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	purchaseHandler := handlers.NewPurchaseHandler()
 
 	// Initialize middleware
 	corsMiddleware := middleware.NewCORSMiddleware()
+	authMiddleware := middleware.NewAuthMiddleware(jwtService)
 
 	// Create router
 	router := mux.NewRouter()
@@ -38,9 +40,17 @@ func main() {
 	// Apply CORS middleware to all routes
 	router.Use(corsMiddleware.CORS)
 
-	// Auth routes
+	// Auth routes (public)
 	router.HandleFunc("/auth/initiate", authHandler.InitiateAuth).Methods("POST")
 	router.HandleFunc("/auth/verify", authHandler.VerifyCode).Methods("POST")
+
+	// Product routes (public)
+	router.HandleFunc("/products", purchaseHandler.GetProducts).Methods("GET")
+
+	// Protected routes (require JWT)
+	protectedRouter := router.PathPrefix("").Subrouter()
+	protectedRouter.Use(authMiddleware.RequireAuth)
+	protectedRouter.HandleFunc("/purchase", purchaseHandler.PurchaseProduct).Methods("POST")
 
 	// Start expired sessions cleanup in background
 	go func() {

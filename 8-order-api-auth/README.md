@@ -69,9 +69,53 @@ Verifies confirmation code and returns JWT token.
 }
 ```
 
-### 3. Using JWT Token
+### 3. Get Products
 
-The JWT token returned from `/auth/verify` can be used for authentication in other services or applications. The token contains user information and is valid for 24 hours.
+**GET** `/products`
+
+Returns list of available products.
+
+**Response:**
+```json
+[
+  {
+    "id": "1",
+    "name": "Laptop",
+    "description": "High-performance laptop",
+    "price": 999.99,
+    "stock": 10
+  }
+]
+```
+
+### 4. Purchase Product (Protected)
+
+**POST** `/purchase`
+
+Purchases a product. Requires JWT token in Authorization header.
+
+**Headers:**
+```
+Authorization: Bearer <token>
+```
+
+**Request:**
+```json
+{
+  "product_id": "1",
+  "quantity": 2
+}
+```
+
+**Response:**
+```json
+{
+  "purchase_id": "purchase-uuid",
+  "total": 1999.98,
+  "status": "completed",
+  "message": "Purchase completed successfully"
+}
+```
 
 ## Configuration
 
@@ -103,8 +147,14 @@ curl -X POST http://localhost:8080/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"sessionId": "your-session-id", "code": "1234"}'
 
-# 3. Use JWT token in your application
-# The token can be used for authentication in other services
+# 3. Get available products
+curl -X GET http://localhost:8080/products
+
+# 4. Purchase a product (use token from step 2)
+curl -X POST http://localhost:8080/purchase \
+  -H "Authorization: Bearer your-jwt-token" \
+  -H "Content-Type: application/json" \
+  -d '{"product_id": "1", "quantity": 2}'
 ```
 
 ## Security
@@ -120,7 +170,8 @@ curl -X POST http://localhost:8080/auth/verify \
 1. Client sends phone number → receives `sessionId`
 2. Server sends SMS with code (mock implementation)
 3. Client sends code + `sessionId` → receives JWT token
-4. JWT token can be used for authentication in other services
+4. Client can browse products (public endpoint)
+5. Client uses JWT token to purchase products (protected endpoint)
 
 ## Project Structure
 
@@ -129,11 +180,14 @@ curl -X POST http://localhost:8080/auth/verify \
 ├── config/
 │   └── config.go
 ├── handlers/
-│   └── auth_handler.go
+│   ├── auth_handler.go
+│   └── purchase_handler.go
 ├── middleware/
+│   ├── auth_middleware.go
 │   └── cors_middleware.go
 ├── models/
-│   └── user.go
+│   ├── user.go
+│   └── product.go
 ├── service/
 │   ├── auth_service.go
 │   ├── jwt_service.go
