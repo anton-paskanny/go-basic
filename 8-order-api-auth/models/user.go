@@ -6,20 +6,20 @@ import (
 
 // User represents a user in the system
 type User struct {
-	ID        string    `json:"id"`
-	Phone     string    `json:"phone"`
+	ID        string    `json:"id" gorm:"type:uuid;primary_key"`
+	Phone     string    `json:"phone" gorm:"size:15;uniqueIndex;not null"`
 	CreatedAt time.Time `json:"created_at"`
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
 // Session represents an authorization session
 type Session struct {
-	ID        string    `json:"id"`
-	Phone     string    `json:"phone"`
-	Code      string    `json:"code"`
-	ExpiresAt time.Time `json:"expires_at"`
+	ID        string    `json:"id" gorm:"type:uuid;primary_key"`
+	Phone     string    `json:"phone" gorm:"size:15;not null"`
+	Code      string    `json:"code" gorm:"size:4;not null"`
+	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
 	CreatedAt time.Time `json:"created_at"`
-	IsUsed    bool      `json:"is_used"`
+	IsUsed    bool      `json:"is_used" gorm:"default:false"`
 }
 
 // AuthRequest represents an authorization request

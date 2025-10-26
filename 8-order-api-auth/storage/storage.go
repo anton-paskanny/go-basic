@@ -23,21 +23,6 @@ func NewInMemoryStorage() *InMemoryStorage {
 	}
 }
 
-// UserStorage interface for working with users
-type UserStorage interface {
-	CreateUser(user *models.User) error
-	GetUserByPhone(phone string) (*models.User, error)
-	GetUserByID(id string) (*models.User, error)
-}
-
-// SessionStorage interface for working with sessions
-type SessionStorage interface {
-	CreateSession(session *models.Session) error
-	GetSession(sessionID string) (*models.Session, error)
-	MarkSessionAsUsed(sessionID string) error
-	CleanupExpiredSessions()
-}
-
 // CreateUser creates a new user
 func (s *InMemoryStorage) CreateUser(user *models.User) error {
 	s.mu.Lock()

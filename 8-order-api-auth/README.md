@@ -16,10 +16,36 @@ The project uses layered architecture:
 
 ## Installation and Running
 
-```bash
-# Install dependencies
-go mod tidy
+### 1. Start the Database
 
+```bash
+# Start PostgreSQL using Docker Compose
+docker-compose up -d
+
+# Verify the database is running
+docker-compose ps
+```
+
+### 2. Configure Environment Variables
+
+```bash
+# Copy the example environment file
+cp .env.example .env
+
+# Edit the .env file with your configuration
+# The application will automatically load variables from .env file
+```
+
+### 3. Install Dependencies
+
+```bash
+# Install Go dependencies
+go mod tidy
+```
+
+### 4. Run the Application
+
+```bash
 # Run server
 go run main.go
 ```
@@ -69,26 +95,7 @@ Verifies confirmation code and returns JWT token.
 }
 ```
 
-### 3. Get Products
-
-**GET** `/products`
-
-Returns list of available products.
-
-**Response:**
-```json
-[
-  {
-    "id": "1",
-    "name": "Laptop",
-    "description": "High-performance laptop",
-    "price": 999.99,
-    "stock": 10
-  }
-]
-```
-
-### 4. Purchase Product (Protected)
+### 3. Purchase Product (Protected)
 
 **POST** `/purchase`
 
@@ -119,18 +126,30 @@ Authorization: Bearer <token>
 
 ## Configuration
 
-Environment variables:
+The application supports configuration through environment variables or a `.env` file. The `.env` file is automatically loaded if present.
+
+### Environment Variables
+
+You can set these variables either in your `.env` file or as system environment variables:
 
 - `PORT` - server port (default: 8080)
 - `JWT_SECRET` - secret key for JWT (default: "your-secret-key-change-in-production")
+- `PRODUCT_SERVICE_URL` - URL of the product service (default: "http://localhost:8081")
+- `DB_HOST` - database host (default: "localhost")
+- `DB_PORT` - database port (default: "5433")
+- `DB_USER` - database user (default: "postgres")
+- `DB_PASSWORD` - database password (default: "postgres")
+- `DB_NAME` - database name (default: "order_api_auth")
+- `DB_SSLMODE` - database SSL mode (default: "disable")
 
 ## Implementation Features
 
 1. **SMS Service** - mock implementation for testing
-2. **Storage** - in-memory storage (replace with database in production)
+2. **Storage** - PostgreSQL database with GORM ORM
 3. **Session Cleanup** - automatic cleanup of expired sessions every 5 minutes
 4. **Validation** - phone number and code format validation
 5. **CORS** - cross-origin request support
+6. **Database Migrations** - automatic schema creation and updates
 
 ## Usage Examples
 
@@ -147,10 +166,7 @@ curl -X POST http://localhost:8080/auth/verify \
   -H "Content-Type: application/json" \
   -d '{"sessionId": "your-session-id", "code": "1234"}'
 
-# 3. Get available products
-curl -X GET http://localhost:8080/products
-
-# 4. Purchase a product (use token from step 2)
+# 3. Purchase a product (use token from step 2)
 curl -X POST http://localhost:8080/purchase \
   -H "Authorization: Bearer your-jwt-token" \
   -H "Content-Type: application/json" \
@@ -170,8 +186,8 @@ curl -X POST http://localhost:8080/purchase \
 1. Client sends phone number → receives `sessionId`
 2. Server sends SMS with code (mock implementation)
 3. Client sends code + `sessionId` → receives JWT token
-4. Client can browse products (public endpoint)
-5. Client uses JWT token to purchase products (protected endpoint)
+4. Client uses JWT token to purchase products (protected endpoint)
+5. Purchase service validates products and manages stock via external product service
 
 ## Project Structure
 
@@ -179,6 +195,9 @@ curl -X POST http://localhost:8080/purchase \
 8-order-api-auth/
 ├── config/
 │   └── config.go
+├── database/
+│   ├── db.go
+│   └── migrations.go
 ├── handlers/
 │   ├── auth_handler.go
 │   └── purchase_handler.go
@@ -186,17 +205,19 @@ curl -X POST http://localhost:8080/purchase \
 │   ├── auth_middleware.go
 │   └── cors_middleware.go
 ├── models/
-│   ├── user.go
-│   └── product.go
+│   └── user.go
 ├── service/
 │   ├── auth_service.go
 │   ├── jwt_service.go
 │   └── sms_service.go
 ├── storage/
+│   ├── postgres_storage.go
 │   └── storage.go
 ├── utils/
 │   ├── response.go
 │   └── validation.go
+├── docker-compose.yml
+├── .env.example
 ├── go.mod
 ├── go.sum
 ├── main.go

@@ -8,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 
 	"order-api-auth/config"
+	"order-api-auth/database"
 	"order-api-auth/handlers"
 	"order-api-auth/middleware"
 	"order-api-auth/service"
@@ -18,8 +19,19 @@ func main() {
 	// Load configuration
 	cfg := config.LoadConfig()
 
+	// Connect to database
+	db, err := database.Connect(cfg)
+	if err != nil {
+		log.Fatalf("Failed to connect to database: %v", err)
+	}
+
+	// Run migrations
+	if err := database.RunMigrations(db); err != nil {
+		log.Fatalf("Failed to run migrations: %v", err)
+	}
+
 	// Initialize storage
-	storage := storage.NewInMemoryStorage()
+	storage := storage.NewPostgreSQLStorage(db)
 
 	// Initialize services
 	smsService := service.NewMockSMSService()
@@ -28,7 +40,7 @@ func main() {
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
-	purchaseHandler := handlers.NewPurchaseHandler()
+	purchaseHandler := handlers.NewPurchaseHandler(cfg.ProductServiceURL)
 
 	// Initialize middleware
 	corsMiddleware := middleware.NewCORSMiddleware()
@@ -43,9 +55,6 @@ func main() {
 	// Auth routes (public)
 	router.HandleFunc("/auth/initiate", authHandler.InitiateAuth).Methods("POST")
 	router.HandleFunc("/auth/verify", authHandler.VerifyCode).Methods("POST")
-
-	// Product routes (public)
-	router.HandleFunc("/products", purchaseHandler.GetProducts).Methods("GET")
 
 	// Protected routes (require JWT)
 	protectedRouter := router.PathPrefix("").Subrouter()
