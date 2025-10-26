@@ -75,13 +75,13 @@ func (oi *OrderItem) BeforeCreate(tx *gorm.DB) error {
 
 // OrderRequest represents a request to create a new order
 type OrderRequest struct {
-	Items []OrderItemRequest `json:"items" validate:"required,min=1"`
+	Items []OrderItemRequest `json:"items" validate:"required,min=1,dive"`
 }
 
 // OrderItemRequest represents an item in the order request
 type OrderItemRequest struct {
-	ProductID string `json:"product_id" validate:"required"`
-	Quantity  int    `json:"quantity" validate:"required,min=1"`
+	ProductID string `json:"product_id" validate:"required,uuid"`
+	Quantity  int    `json:"quantity" validate:"required,min=1,max=1000"`
 }
 
 // OrderResponse represents a response for order operations

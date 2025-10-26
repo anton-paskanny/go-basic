@@ -12,6 +12,7 @@ Microservice for managing orders: creation, retrieval, and user-specific order m
 - **Quantity Management**: Automatic quantity updates via product service
 - **Lightweight**: Uses only Go standard library (net/http) - no external web framework
 - **Service Boundaries**: Only manages order data, delegates user/product data to other services
+- **Input Validation**: Comprehensive request validation using go-playground/validator
 
 ## API Endpoints
 
@@ -302,7 +303,39 @@ This service uses Go's standard library `net/http` package instead of external w
 ### Middleware Architecture
 - **CORS Middleware**: Handles cross-origin requests
 - **Auth Middleware**: JWT token validation and user context injection
+- **Validation Middleware**: Request body validation using go-playground/validator
 - **Handler Functions**: Direct net/http handler functions for each endpoint
+
+### Input Validation
+
+The service uses comprehensive input validation with the following features:
+
+#### Validation Rules for Order Creation
+```go
+type OrderRequest struct {
+    Items []OrderItemRequest `json:"items" validate:"required,min=1,dive"`
+}
+
+type OrderItemRequest struct {
+    ProductID string `json:"product_id" validate:"required,uuid"`
+    Quantity  int    `json:"quantity" validate:"required,min=1,max=1000"`
+}
+```
+
+#### Validation Features
+- **Required Fields**: Ensures all mandatory fields are present
+- **UUID Validation**: Validates product IDs are proper UUIDs
+- **Range Validation**: Quantity must be between 1 and 1000
+- **Array Validation**: Items array must contain at least one item
+- **Dive Validation**: Validates each item in the array individually
+
+#### Error Response Format
+```json
+{
+  "error": "Validation failed",
+  "message": "Items is required; ProductID must be a valid UUID; Quantity must be at least 1"
+}
+```
 
 ## Database Schema
 

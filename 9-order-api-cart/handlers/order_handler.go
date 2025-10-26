@@ -7,19 +7,23 @@ import (
 	"strconv"
 	"strings"
 
+	"order-api-cart/middleware"
 	"order-api-cart/models"
 	"order-api-cart/service"
+	"order-api-cart/validation"
 )
 
 // OrderHandler handles order-related HTTP requests
 type OrderHandler struct {
 	orderService *service.OrderService
+	validator    *validation.Validator
 }
 
 // NewOrderHandler creates a new order handler
 func NewOrderHandler(authServiceURL, productServiceURL string) *OrderHandler {
 	return &OrderHandler{
 		orderService: service.NewOrderService(authServiceURL, productServiceURL),
+		validator:    validation.New(),
 	}
 }
 
@@ -46,8 +50,7 @@ func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate request
-	if len(req.Items) == 0 {
-		http.Error(w, "Order must contain at least one item", http.StatusBadRequest)
+	if !middleware.ValidateStruct(w, h.validator, &req) {
 		return
 	}
 
