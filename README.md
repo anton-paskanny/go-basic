@@ -26,7 +26,7 @@ This repository contains a progressive series of Go projects designed to teach v
 ### Microservices Architecture
 - **`6-validation-api`**: Email verification API with SMTP integration and JSON storage
 - **`7-order-api-stat`**: Product management API with PostgreSQL, CRUD operations, and pagination
-- **`8-order-api-auth`**: JWT authentication service with SMS verification and in-memory storage
+- **`8-order-api-auth`**: JWT authentication service with SMS verification and PostgreSQL storage
 - **`9-order-api-cart`**: Order management API with external service integration and comprehensive E2E testing
 
 ## Quick Start
@@ -85,17 +85,17 @@ Projects 7-9 form a complete microservices ecosystem:
 │ - User Auth     │    │ - Product Mgmt  │    │ - Order Mgmt    │
 │ - JWT Tokens    │    │ - Inventory     │    │ - Cart Logic    │
 │ - SMS Verify    │    │ - CRUD Ops      │    │ - E2E Tests     │
-│ - In-Memory     │    │ - PostgreSQL    │    │ - PostgreSQL    │
+│ - PostgreSQL    │    │ - PostgreSQL    │    │ - PostgreSQL    │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
          │                       │                       │
          └───────────────────────┼───────────────────────┘
                                  │
                     ┌─────────────────┐
-                    │ 6-validation-api│
+                    │   Client Apps   │
                     │                 │
-                    │ - Email Verify  │
-                    │ - SMTP Service  │
-                    │ - JSON Storage  │
+                    │ - Web Frontend  │
+                    │ - Mobile Apps   │
+                    │ - API Clients   │
                     └─────────────────┘
 ```
 
