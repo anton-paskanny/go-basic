@@ -22,16 +22,16 @@ This repository contains a progressive series of Go projects designed to teach v
 ### Concurrency and Web APIs
 - **`4-concurrency`**: Goroutines, channels, and synchronization patterns
 - **`5-random-api`**: Simple HTTP API returning random numbers (1-6)
+- **`6-validation-api`**: Email verification API with SMTP integration and JSON storage
 
 ### Microservices Architecture
-- **`6-validation-api`**: Email verification API with SMTP integration and JSON storage
 - **`7-order-api-stat`**: Product management API with PostgreSQL, CRUD operations, and pagination
 - **`8-order-api-auth`**: JWT authentication service with SMS verification and PostgreSQL storage
 - **`9-order-api-cart`**: Order management API with external service integration and comprehensive E2E testing
 
 ## Quick Start
 
-### Basic Projects (1-5)
+### Basic Projects (1-6)
 ```bash
 # Run individual projects
 cd 1-converter && go run .
@@ -39,31 +39,24 @@ cd 2-calc && go run .
 cd 3-bin && go run .
 cd 4-concurrency && go run .
 cd 5-random-api && go run .
+cd 6-validation-api && go run .
 ```
 
-### Microservices Projects (6-9)
-
-#### 6. Email Verification API
-```bash
-cd 6-validation-api
-# Set up environment variables or .env file
-go run main.go
-# API runs on :8080
-```
+### Microservices Projects (7-9)
 
 #### 7. Product Management API
 ```bash
 cd 7-order-api-stat
 docker-compose up -d  # Start PostgreSQL
 go run main.go
-# API runs on :8080
+# API runs on :8081
 ```
 
 #### 8. Authentication Service
 ```bash
 cd 8-order-api-auth
 go run main.go
-# API runs on :8080
+# API runs on :8082
 ```
 
 #### 9. Order Management API
@@ -71,7 +64,7 @@ go run main.go
 cd 9-order-api-cart
 docker-compose up -d  # Start PostgreSQL
 go run main.go
-# API runs on :8080
+# API runs on :8083
 ```
 
 ## Microservices Ecosystem
