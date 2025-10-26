@@ -283,11 +283,164 @@ The `docker-compose.yml` file includes:
 - **Service Dependencies**: Order service waits for database to be healthy
 - **Network Isolation**: Services communicate through dedicated network
 
-### Testing
+## Testing
 
-Run the test script to start PostgreSQL and test the service:
+This project includes comprehensive end-to-end (E2E) tests for order creation and management.
+
+### Test Structure
+
+```
+tests/
+├── e2e_test.go           # Main E2E tests
+├── test_config.go        # Test configuration
+├── test_helpers.go      # Helper functions and mocks
+├── docker-compose.test.yml # Test database
+└── run_e2e_tests.sh     # Test runner script
+```
+
+### Test Scenarios
+
+1. **TestCreateOrderE2E** - Order creation testing:
+   - Successful order creation with multiple products
+   - Error handling for non-existent products
+   - Error handling for insufficient quantity
+   - Authorization error handling
+   - Request validation
+
+2. **TestGetOrderByIDE2E** - Order retrieval by ID:
+   - Successful order retrieval
+   - Error handling for non-existent orders
+
+3. **TestGetMyOrdersE2E** - User order listing:
+   - Successful retrieval of user's orders
+
+### Test Data Preparation
+
+#### Test Database
+Tests use a separate PostgreSQL test database running in a Docker container.
+
+#### Mock External Services
+Tests use mocks for external services:
+- **MockAuthService** - Authentication service mock
+- **MockProductService** - Product service mock
+
+#### Test Data
+For each test, the following is created:
+- Test user
+- Test products
+- JWT token for authorization
+
+### Running Tests
+
+#### Quick Start
+From project root:
 ```bash
-./test.sh
+./run_tests.sh
+```
+
+From tests directory:
+```bash
+cd tests
+./run_e2e_tests.sh
+```
+
+#### Manual Setup
+
+1. Start test database:
+```bash
+docker-compose -f tests/docker-compose.test.yml up -d
+```
+
+2. Set environment variables:
+```bash
+export DB_HOST=localhost
+export DB_PORT=5433
+export DB_USER=postgres
+export DB_PASSWORD=password
+export DB_NAME=order_cart_test_db
+export DB_SSLMODE=disable
+export SERVER_PORT=8083
+export AUTH_SERVICE_URL=http://localhost:8084
+export PRODUCT_SERVICE_URL=http://localhost:8085
+export JWT_SECRET=test-secret-key
+```
+
+3. Run tests:
+```bash
+go test -v -run TestCreateOrderE2E,TestGetOrderByIDE2E,TestGetMyOrdersE2E ./tests/...
+```
+
+4. Stop test database:
+```bash
+docker-compose -f tests/docker-compose.test.yml down
+```
+
+### Test Environment Variables
+
+| Variable | Description | Default Value |
+|----------|-------------|---------------|
+| `DB_HOST` | Database host | `localhost` |
+| `DB_PORT` | Database port | `5433` |
+| `DB_USER` | Database user | `postgres` |
+| `DB_PASSWORD` | Database password | `password` |
+| `DB_NAME` | Database name | `order_cart_test_db` |
+| `DB_SSLMODE` | SSL mode | `disable` |
+| `SERVER_PORT` | Server port | `8083` |
+| `AUTH_SERVICE_URL` | Auth service URL | `http://localhost:8084` |
+| `PRODUCT_SERVICE_URL` | Product service URL | `http://localhost:8085` |
+| `JWT_SECRET` | JWT secret key | `test-secret-key` |
+
+### Test Cleanup
+
+After each test:
+- Test database is cleaned
+- Mock services are stopped
+- HTTP connections are closed
+
+### Test Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   E2E Tests    │    │  Test Server    │    │  Test Database  │
+│                 │    │                 │    │                 │
+│ - Create Order  │───▶│ - Order Handler │───▶│ - Orders Table │
+│ - Get Order     │    │ - Auth Middleware│    │ - Order Items  │
+│ - Get My Orders │    │ - CORS Middleware│    │                 │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+         │                       │
+         ▼                       ▼
+┌─────────────────┐    ┌─────────────────┐
+│ Mock Auth Svc   │    │ Mock Product Svc│
+│                 │    │                 │
+│ - Validate User │    │ - Get Product   │
+│ - Get User      │    │ - Update Qty    │
+└─────────────────┘    └─────────────────┘
+```
+
+### Debugging Tests
+
+#### Test Logs
+Tests output detailed logs for debugging:
+- Test data creation
+- HTTP requests and responses
+- Database errors
+- External service errors
+
+#### State Verification
+After tests, you can verify:
+- Database state
+- Docker container logs
+- Network connections
+
+```bash
+# Check container status
+docker-compose -f tests/docker-compose.test.yml ps
+
+# View logs
+docker-compose -f tests/docker-compose.test.yml logs
+
+# Connect to test database
+docker-compose -f tests/docker-compose.test.yml exec test-postgres psql -U postgres -d order_cart_test_db
 ```
 
 ## Implementation Details
