@@ -46,7 +46,7 @@ cd "$PROJECT_ROOT"
 
 # Start test database
 print_status "Starting test database..."
-docker-compose -f tests/docker-compose.test.yml up -d test-postgres
+docker-compose -f docker-compose.test.yml up -d test-postgres
 
 # Wait for database to be ready
 print_status "Waiting for database to be ready..."

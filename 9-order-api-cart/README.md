@@ -348,7 +348,7 @@ cd tests
 
 1. Start test database:
 ```bash
-docker-compose -f tests/docker-compose.test.yml up -d
+docker-compose -f docker-compose.test.yml up -d
 ```
 
 2. Set environment variables:
@@ -372,7 +372,7 @@ go test -v -run TestCreateOrderE2E,TestGetOrderByIDE2E,TestGetMyOrdersE2E ./test
 
 4. Stop test database:
 ```bash
-docker-compose -f tests/docker-compose.test.yml down
+docker-compose -f docker-compose.test.yml down
 ```
 
 ### Test Environment Variables
