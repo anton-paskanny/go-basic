@@ -1,0 +1,62 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: postgres:15
+    container_name: order-cart-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME:-order_cart_db}
+      POSTGRES_USER: ${DB_USER:-postgres}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-password}
+    ports:
+      - "${DB_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - order-cart-network
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${DB_USER:-postgres} -d ${DB_NAME:-order_cart_db}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  order-api-cart:
+    build: .
+    container_name: order-api-cart
+    ports:
+      - "${SERVER_PORT:-8080}:8080"
+    environment:
+      # Database Configuration
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: ${DB_USER:-postgres}
+      DB_PASSWORD: ${DB_PASSWORD:-password}
+      DB_NAME: ${DB_NAME:-order_cart_db}
+      DB_SSLMODE: ${DB_SSLMODE:-disable}
+
+      # Server Configuration
+      SERVER_PORT: 8080
+
+      # JWT Configuration
+      JWT_SECRET: ${JWT_SECRET:-your-secret-key}
+
+      # External Service URLs
+      AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://host.docker.internal:8081}
+      PRODUCT_SERVICE_URL: ${PRODUCT_SERVICE_URL:-http://host.docker.internal:8082}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - order-cart-network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+
+networks:
+  order-cart-network:
+    driver: bridge

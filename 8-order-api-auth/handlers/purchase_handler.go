@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"time"
 
@@ -11,63 +12,27 @@ import (
 	"order-api-auth/utils"
 )
 
+// ExternalProduct represents a product from the product service
+type ExternalProduct struct {
+	ID          uint    `json:"id"`
+	Name        string  `json:"name"`
+	Description string  `json:"description"`
+	Price       float64 `json:"price"`
+	Quantity    int     `json:"quantity"`
+	Category    string  `json:"category"`
+	SKU         string  `json:"sku"`
+}
+
 // PurchaseHandler handler for purchase operations
 type PurchaseHandler struct {
-	products map[string]*models.Product
+	productServiceURL string
 }
 
 // NewPurchaseHandler creates a new purchase handler
-func NewPurchaseHandler() *PurchaseHandler {
-	// Initialize with some sample products
-	products := map[string]*models.Product{
-		"1": {
-			ID:          "1",
-			Name:        "Laptop",
-			Description: "High-performance laptop",
-			Price:       999.99,
-			Stock:       10,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		"2": {
-			ID:          "2",
-			Name:        "Smartphone",
-			Description: "Latest smartphone model",
-			Price:       699.99,
-			Stock:       25,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-		"3": {
-			ID:          "3",
-			Name:        "Headphones",
-			Description: "Wireless noise-canceling headphones",
-			Price:       199.99,
-			Stock:       50,
-			CreatedAt:   time.Now(),
-			UpdatedAt:   time.Now(),
-		},
-	}
-
+func NewPurchaseHandler(productServiceURL string) *PurchaseHandler {
 	return &PurchaseHandler{
-		products: products,
+		productServiceURL: productServiceURL,
 	}
-}
-
-// GetProducts returns list of available products
-func (h *PurchaseHandler) GetProducts(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		utils.WriteErrorResponse(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
-
-	// Convert map to slice
-	productList := make([]*models.Product, 0, len(h.products))
-	for _, product := range h.products {
-		productList = append(productList, product)
-	}
-
-	utils.WriteJSONResponse(w, http.StatusOK, productList)
 }
 
 // PurchaseProduct handles product purchase
@@ -94,15 +59,15 @@ func (h *PurchaseHandler) PurchaseProduct(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get product
-	product, exists := h.products[req.ProductID]
-	if !exists {
+	// Get product from external service
+	product, err := h.getProductFromService(req.ProductID)
+	if err != nil {
 		utils.WriteErrorResponse(w, http.StatusNotFound, "Product not found")
 		return
 	}
 
 	// Check stock
-	if product.Stock < req.Quantity {
+	if product.Quantity < req.Quantity {
 		utils.WriteErrorResponse(w, http.StatusBadRequest, "Insufficient stock")
 		return
 	}
@@ -126,10 +91,6 @@ func (h *PurchaseHandler) PurchaseProduct(w http.ResponseWriter, r *http.Request
 		UpdatedAt: time.Now(),
 	}
 
-	// Update stock
-	product.Stock -= req.Quantity
-	product.UpdatedAt = time.Now()
-
 	// Return response
 	response := models.PurchaseResponse{
 		PurchaseID: purchase.ID,
@@ -139,4 +100,26 @@ func (h *PurchaseHandler) PurchaseProduct(w http.ResponseWriter, r *http.Request
 	}
 
 	utils.WriteJSONResponse(w, http.StatusOK, response)
+}
+
+// getProductFromService fetches product information from the product service
+func (h *PurchaseHandler) getProductFromService(productID string) (*ExternalProduct, error) {
+	url := fmt.Sprintf("%s/products/%s", h.productServiceURL, productID)
+
+	resp, err := http.Get(url)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("product not found")
+	}
+
+	var product ExternalProduct
+	if err := json.NewDecoder(resp.Body).Decode(&product); err != nil {
+		return nil, err
+	}
+
+	return &product, nil
 }
