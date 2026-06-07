@@ -56,7 +56,6 @@ func (s *Service) SendVerificationEmail(emailAddr string) (string, error) {
 	s.storage.Set(hash, StorableVerificationData{
 		Email:     emailAddr,
 		CreatedAt: time.Now(),
-		Verified:  false,
 	})
 
 	// Save to JSON file
@@ -66,7 +65,7 @@ func (s *Service) SendVerificationEmail(emailAddr string) (string, error) {
 	s.mu.Unlock()
 
 	// Create verification link
-	verificationLink := fmt.Sprintf("http://localhost%s/verify/%s", s.cfg.Server.Address, hash)
+	verificationLink := fmt.Sprintf("%s/verify/%s", s.cfg.Server.BaseURL, hash)
 
 	// Create email
 	e := email.NewEmail()

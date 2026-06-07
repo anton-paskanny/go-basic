@@ -3,6 +3,7 @@ package verify
 import (
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"strings"
 
@@ -118,7 +119,7 @@ func (h *Handler) VerifyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html")
-	fmt.Fprintf(w, "<h1>Email Verified</h1><p>Your email %s has been successfully verified.</p>", email)
+	fmt.Fprintf(w, "<h1>Email Verified</h1><p>Your email %s has been successfully verified.</p>", html.EscapeString(email))
 }
 
 // RegisterRoutes registers the verification routes

@@ -22,6 +22,7 @@ type EmailConfig struct {
 // ServerConfig holds server configuration
 type ServerConfig struct {
 	Address string
+	BaseURL string
 }
 
 // NewConfig creates a new configuration with default values
@@ -35,6 +36,7 @@ func NewConfig() *Config {
 		},
 		Server: ServerConfig{
 			Address: getEnv("SERVER_ADDRESS", ":8080"),
+			BaseURL: getEnv("BASE_URL", "http://localhost:8080"),
 		},
 	}
 }

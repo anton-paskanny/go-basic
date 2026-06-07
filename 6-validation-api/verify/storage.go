@@ -21,7 +21,6 @@ const (
 type StorableVerificationData struct {
 	Email     string    `json:"email"`
 	CreatedAt time.Time `json:"created_at"`
-	Verified  bool      `json:"verified"`
 }
 
 // VerificationStorage handles saving and loading verification data
@@ -124,16 +123,3 @@ func (s *VerificationStorage) Delete(hash string) {
 	delete(s.verifications, hash)
 }
 
-// GetAll gets all verification data
-func (s *VerificationStorage) GetAll() map[string]StorableVerificationData {
-	s.mu.RLock()
-	defer s.mu.RUnlock()
-
-	// Create a copy to avoid concurrent access issues
-	result := make(map[string]StorableVerificationData, len(s.verifications))
-	for k, v := range s.verifications {
-		result[k] = v
-	}
-
-	return result
-}

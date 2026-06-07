@@ -14,6 +14,7 @@ The application can be configured using environment variables:
 
 ### Server Configuration
 - `SERVER_ADDRESS`: Server address and port (default: :8080)
+- `BASE_URL`: Public base URL used in verification email links (default: http://localhost:8080)
 
 ## API Endpoints
 
@@ -55,6 +56,7 @@ export EMAIL_PASSWORD=your-password
 export EMAIL_HOST=smtp.example.com
 export EMAIL_PORT=587
 export SERVER_ADDRESS=:8080
+export BASE_URL=http://localhost:8080
 
 # Run the application
 go run main.go
@@ -66,7 +68,7 @@ The application automatically loads environment variables from a `.env` file if 
 
 1. Copy the example environment file:
 ```bash
-cp env.example .env
+cp .env.example .env
 ```
 
 2. Edit the `.env` file with your configuration values
@@ -84,7 +86,8 @@ Verification data is stored in a JSON file at `data/verification_data.json`. Thi
 
 - Loaded when the application starts
 - Saved when new verification emails are sent
-- Deleted after successful verification or when expired
+- Deleted immediately after successful verification
+- Expired records (older than 24 hours) are removed on the next verification attempt for that hash; unclicked links accumulate until then
 
 ## Error Handling
 
