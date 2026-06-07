@@ -1,9 +1,9 @@
 package service
 
 import (
+	"crypto/rand"
 	"fmt"
-	"math/rand"
-	"time"
+	"math/big"
 )
 
 // SMSService interface for sending SMS
@@ -22,13 +22,17 @@ func NewMockSMSService() *MockSMSService {
 
 // SendCode sends SMS with code (in real project this would be SMS provider integration)
 func (s *MockSMSService) SendCode(phone, code string) error {
-	// In real project this would be SMS provider API call
-	fmt.Printf("🔐 SMS sent to %s with code: %s\n", phone, code)
+	// In real project this would be an SMS provider API call.
+	// The code is intentionally not logged to avoid leaking OTPs.
+	fmt.Printf("SMS sent to %s\n", phone)
 	return nil
 }
 
-// GenerateCode generates a 4-digit verification code
+// GenerateCode generates a cryptographically random 4-digit verification code.
 func (s *MockSMSService) GenerateCode() string {
-	rand.Seed(time.Now().UnixNano())
-	return fmt.Sprintf("%04d", rand.Intn(10000))
+	n, err := rand.Int(rand.Reader, big.NewInt(10000))
+	if err != nil {
+		panic("failed to generate secure random code: " + err.Error())
+	}
+	return fmt.Sprintf("%04d", n.Int64())
 }

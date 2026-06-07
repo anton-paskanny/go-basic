@@ -20,6 +20,7 @@ type Session struct {
 	ExpiresAt time.Time `json:"expires_at" gorm:"not null"`
 	CreatedAt time.Time `json:"created_at"`
 	IsUsed    bool      `json:"is_used" gorm:"default:false"`
+	Attempts  int       `json:"attempts" gorm:"default:0"`
 }
 
 // AuthRequest represents an authorization request

@@ -21,6 +21,7 @@ type SessionStorage interface {
 	CreateSession(session *models.Session) error
 	GetSession(sessionID string) (*models.Session, error)
 	MarkSessionAsUsed(sessionID string) error
+	IncrementAttempts(sessionID string) error
 	CleanupExpiredSessions()
 }
 
@@ -93,13 +94,27 @@ func (s *PostgreSQLStorage) GetSession(sessionID string) (*models.Session, error
 	return &session, nil
 }
 
-// MarkSessionAsUsed marks session as used
+// MarkSessionAsUsed atomically marks a session as used. Returns an error if the
+// session was already used (protects against concurrent double-verification).
 func (s *PostgreSQLStorage) MarkSessionAsUsed(sessionID string) error {
-	result := s.db.Model(&models.Session{}).Where("id = ?", sessionID).Update("is_used", true)
+	result := s.db.Model(&models.Session{}).
+		Where("id = ? AND is_used = ?", sessionID, false).
+		Update("is_used", true)
 	if result.Error != nil {
 		return result.Error
 	}
+	if result.RowsAffected == 0 {
+		return errors.New("session already used")
+	}
 	return nil
+}
+
+// IncrementAttempts increments the failed verification attempt counter for a session.
+func (s *PostgreSQLStorage) IncrementAttempts(sessionID string) error {
+	result := s.db.Model(&models.Session{}).
+		Where("id = ?", sessionID).
+		UpdateColumn("attempts", gorm.Expr("attempts + 1"))
+	return result.Error
 }
 
 // CleanupExpiredSessions removes expired sessions

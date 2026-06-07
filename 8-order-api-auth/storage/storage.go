@@ -88,7 +88,7 @@ func (s *InMemoryStorage) GetSession(sessionID string) (*models.Session, error) 
 	return session, nil
 }
 
-// MarkSessionAsUsed marks session as used
+// MarkSessionAsUsed atomically marks a session as used.
 func (s *InMemoryStorage) MarkSessionAsUsed(sessionID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
@@ -97,8 +97,23 @@ func (s *InMemoryStorage) MarkSessionAsUsed(sessionID string) error {
 	if !exists {
 		return errors.New("session not found")
 	}
-
+	if session.IsUsed {
+		return errors.New("session already used")
+	}
 	session.IsUsed = true
+	return nil
+}
+
+// IncrementAttempts increments the failed verification attempt counter.
+func (s *InMemoryStorage) IncrementAttempts(sessionID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	session, exists := s.sessions[sessionID]
+	if !exists {
+		return errors.New("session not found")
+	}
+	session.Attempts++
 	return nil
 }
 

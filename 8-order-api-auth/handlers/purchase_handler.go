@@ -72,8 +72,12 @@ func (h *PurchaseHandler) PurchaseProduct(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	// Get user ID from context (set by middleware)
-	userID := r.Context().Value("user_id").(string)
+	// Get user ID from context (set by auth middleware)
+	userID, ok := r.Context().Value("user_id").(string)
+	if !ok || userID == "" {
+		utils.WriteErrorResponse(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
 
 	// Calculate total
 	total := product.Price * float64(req.Quantity)

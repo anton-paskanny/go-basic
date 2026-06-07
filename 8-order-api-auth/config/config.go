@@ -25,6 +25,8 @@ type DatabaseConfig struct {
 	SSLMode  string
 }
 
+const defaultJWTSecret = "your-secret-key-change-in-production"
+
 // LoadConfig загружает конфигурацию из переменных окружения
 func LoadConfig() *Config {
 	// Load .env file if it exists
@@ -33,7 +35,7 @@ func LoadConfig() *Config {
 	}
 	config := &Config{
 		Port:              getEnv("PORT", "8080"),
-		JWTSecret:         getEnv("JWT_SECRET", "your-secret-key-change-in-production"),
+		JWTSecret:         getEnv("JWT_SECRET", defaultJWTSecret),
 		ProductServiceURL: getEnv("PRODUCT_SERVICE_URL", "http://localhost:8081"),
 		Database: DatabaseConfig{
 			Host:     getEnv("DB_HOST", "localhost"),
@@ -43,6 +45,10 @@ func LoadConfig() *Config {
 			Name:     getEnv("DB_NAME", "order_api_auth"),
 			SSLMode:  getEnv("DB_SSLMODE", "disable"),
 		},
+	}
+
+	if config.JWTSecret == defaultJWTSecret {
+		log.Println("WARNING: JWT_SECRET is set to the default placeholder. Set a strong secret via the JWT_SECRET environment variable before deploying to production.")
 	}
 
 	return config

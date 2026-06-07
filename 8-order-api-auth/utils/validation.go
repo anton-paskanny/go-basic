@@ -3,6 +3,8 @@ package utils
 import (
 	"regexp"
 	"strings"
+
+	"github.com/google/uuid"
 )
 
 // ValidatePhone validates phone number correctness
@@ -42,8 +44,7 @@ func ValidateSessionID(sessionID string) error {
 		return &ValidationError{Field: "sessionId", Message: "Session ID is required"}
 	}
 
-	// Check basic UUID length
-	if len(sessionID) < 10 {
+	if _, err := uuid.Parse(sessionID); err != nil {
 		return &ValidationError{Field: "sessionId", Message: "Invalid session ID format"}
 	}
 

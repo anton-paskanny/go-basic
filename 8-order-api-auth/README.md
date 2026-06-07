@@ -133,7 +133,7 @@ The application supports configuration through environment variables or a `.env`
 You can set these variables either in your `.env` file or as system environment variables:
 
 - `PORT` - server port (default: 8080)
-- `JWT_SECRET` - secret key for JWT (default: "your-secret-key-change-in-production")
+- `JWT_SECRET` - secret key for JWT (**required in production** — the app warns on startup if the default placeholder is used; generate with `openssl rand -hex 32`)
 - `PRODUCT_SERVICE_URL` - URL of the product service (default: "http://localhost:8081")
 - `DB_HOST` - database host (default: "localhost")
 - `DB_PORT` - database port (default: "5433")
@@ -177,9 +177,13 @@ curl -X POST http://localhost:8080/purchase \
 
 - JWT tokens are valid for 24 hours
 - Sessions expire after 5 minutes
-- Confirmation codes are generated randomly
-- All input data validation
+- Confirmation codes are generated using a cryptographically secure random source
+- OTP codes are never written to logs
+- Verification is rate-limited: sessions are locked after 5 incorrect code attempts
+- Code comparison uses constant-time logic to prevent timing attacks
+- All input data is validated
 - CORS support
+- `JWT_SECRET` must be set to a strong secret in production (app warns on startup if using the default)
 
 ## Authorization Flow
 

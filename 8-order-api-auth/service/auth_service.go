@@ -1,6 +1,7 @@
 package service
 
 import (
+	"crypto/subtle"
 	"errors"
 	"time"
 
@@ -9,6 +10,8 @@ import (
 	"order-api-auth/models"
 	"order-api-auth/storage"
 )
+
+const maxCodeAttempts = 5
 
 // AuthService interface for authorization
 type AuthService interface {
@@ -41,42 +44,40 @@ func NewAuthService(
 
 // InitiateAuth initiates authorization process
 func (a *AuthServiceImpl) InitiateAuth(phone string) (*models.AuthResponse, error) {
-	// Check if user exists
+	// Check if user exists; only create one when record is genuinely absent
 	user, err := a.userStorage.GetUserByPhone(phone)
 	if err != nil {
-		// If user not found, create new one
+		if err.Error() != "user not found" {
+			return nil, err
+		}
 		user = &models.User{
 			ID:        uuid.New().String(),
 			Phone:     phone,
 			CreatedAt: time.Now(),
 			UpdatedAt: time.Now(),
 		}
-
 		if err := a.userStorage.CreateUser(user); err != nil {
 			return nil, err
 		}
 	}
 
-	// Generate verification code
+	// Generate verification code and send SMS before persisting the session,
+	// so a failed SMS does not leave an orphaned session in the DB.
 	code := a.smsService.GenerateCode()
+	if err := a.smsService.SendCode(phone, code); err != nil {
+		return nil, err
+	}
 
-	// Create session
 	sessionID := uuid.New().String()
 	session := &models.Session{
 		ID:        sessionID,
 		Phone:     phone,
 		Code:      code,
-		ExpiresAt: time.Now().Add(5 * time.Minute), // Session valid for 5 minutes
+		ExpiresAt: time.Now().Add(5 * time.Minute),
 		CreatedAt: time.Now(),
 		IsUsed:    false,
 	}
-
 	if err := a.sessionStorage.CreateSession(session); err != nil {
-		return nil, err
-	}
-
-	// Send SMS with code
-	if err := a.smsService.SendCode(phone, code); err != nil {
 		return nil, err
 	}
 
@@ -103,8 +104,14 @@ func (a *AuthServiceImpl) VerifyCode(sessionID, code string) (*models.TokenRespo
 		return nil, errors.New("session already used")
 	}
 
-	// Verify code
-	if session.Code != code {
+	// Enforce brute-force limit before checking the code
+	if session.Attempts >= maxCodeAttempts {
+		return nil, errors.New("too many incorrect attempts, session is locked")
+	}
+
+	// Constant-time comparison prevents timing attacks
+	if subtle.ConstantTimeCompare([]byte(session.Code), []byte(code)) != 1 {
+		_ = a.sessionStorage.IncrementAttempts(sessionID)
 		return nil, errors.New("invalid code")
 	}
 
