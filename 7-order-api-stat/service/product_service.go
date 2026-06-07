@@ -2,11 +2,11 @@ package service
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"gorm.io/gorm"
 
-	"order-api-stat/database"
 	"order-api-stat/models"
 )
 
@@ -16,21 +16,12 @@ type ProductService struct {
 }
 
 // NewProductService creates a new product service
-func NewProductService() *ProductService {
-	return &ProductService{
-		db: database.GetDB(),
-	}
+func NewProductService(db *gorm.DB) *ProductService {
+	return &ProductService{db: db}
 }
 
 // CreateProduct creates a new product
 func (s *ProductService) CreateProduct(req *models.CreateProductRequest) (*models.Product, error) {
-	// Check if SKU already exists
-	var existingProduct models.Product
-	if err := s.db.Where("sku = ?", req.SKU).First(&existingProduct).Error; err == nil {
-		return nil, fmt.Errorf("product with SKU '%s' already exists", req.SKU)
-	}
-
-	// Create new product
 	product := &models.Product{
 		Name:        req.Name,
 		Description: req.Description,
@@ -42,6 +33,9 @@ func (s *ProductService) CreateProduct(req *models.CreateProductRequest) (*model
 	}
 
 	if err := s.db.Create(product).Error; err != nil {
+		if isUniqueConstraintError(err) {
+			return nil, fmt.Errorf("product with SKU '%s' already exists", req.SKU)
+		}
 		return nil, fmt.Errorf("failed to create product: %w", err)
 	}
 
@@ -119,14 +113,6 @@ func (s *ProductService) UpdateProduct(id uint, req *models.UpdateProductRequest
 		return nil, fmt.Errorf("failed to get product: %w", err)
 	}
 
-	// Check if SKU is being updated and if it already exists
-	if req.SKU != nil && *req.SKU != product.SKU {
-		var existingProduct models.Product
-		if err := s.db.Where("sku = ? AND id != ?", *req.SKU, id).First(&existingProduct).Error; err == nil {
-			return nil, fmt.Errorf("product with SKU '%s' already exists", *req.SKU)
-		}
-	}
-
 	// Update fields if provided
 	updates := make(map[string]interface{})
 	if req.Name != nil {
@@ -152,6 +138,9 @@ func (s *ProductService) UpdateProduct(id uint, req *models.UpdateProductRequest
 	}
 
 	if err := s.db.Model(&product).Updates(updates).Error; err != nil {
+		if req.SKU != nil && isUniqueConstraintError(err) {
+			return nil, fmt.Errorf("product with SKU '%s' already exists", *req.SKU)
+		}
 		return nil, fmt.Errorf("failed to update product: %w", err)
 	}
 
@@ -161,6 +150,14 @@ func (s *ProductService) UpdateProduct(id uint, req *models.UpdateProductRequest
 	}
 
 	return &product, nil
+}
+
+// isUniqueConstraintError reports whether err is a PostgreSQL unique constraint violation.
+func isUniqueConstraintError(err error) bool {
+	msg := err.Error()
+	return strings.Contains(msg, "23505") ||
+		strings.Contains(msg, "duplicate key") ||
+		strings.Contains(msg, "unique constraint")
 }
 
 // DeleteProduct soft deletes a product

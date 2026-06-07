@@ -13,7 +13,6 @@ import (
 	"order-api-stat/database"
 	"order-api-stat/handlers"
 	"order-api-stat/utils"
-	"order-api-stat/validation"
 
 	"github.com/sirupsen/logrus"
 )
@@ -40,12 +39,8 @@ func main() {
 		logrus.Fatalf("Failed to run migrations: %v", err)
 	}
 
-	// Initialize validator
-	validator := validation.New()
-	_ = validator // Use validator in handlers
-
 	// Initialize handlers
-	productHandler := handlers.NewProductHandler()
+	productHandler := handlers.NewProductHandler(db)
 	healthHandler := handlers.NewHealthHandler()
 
 	// Setup routes

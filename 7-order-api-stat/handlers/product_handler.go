@@ -3,9 +3,12 @@ package handlers
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+
+	"gorm.io/gorm"
 
 	"order-api-stat/models"
 	"order-api-stat/service"
@@ -19,9 +22,9 @@ type ProductHandler struct {
 }
 
 // NewProductHandler creates a new product handler
-func NewProductHandler() *ProductHandler {
+func NewProductHandler(db *gorm.DB) *ProductHandler {
 	return &ProductHandler{
-		productService: service.NewProductService(),
+		productService: service.NewProductService(db),
 		validator:      validation.New(),
 	}
 }
@@ -33,6 +36,7 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 	var req models.CreateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload", nil)
@@ -48,6 +52,10 @@ func (h *ProductHandler) CreateProduct(w http.ResponseWriter, r *http.Request) {
 	// Create product
 	product, err := h.productService.CreateProduct(&req)
 	if err != nil {
+		if strings.Contains(err.Error(), "already exists") {
+			h.sendErrorResponse(w, http.StatusConflict, err.Error(), nil)
+			return
+		}
 		h.sendErrorResponse(w, http.StatusInternalServerError, err.Error(), nil)
 		return
 	}
@@ -163,6 +171,7 @@ func (h *ProductHandler) UpdateProduct(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20) // 1 MB
 	var req models.UpdateProductRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.sendErrorResponse(w, http.StatusBadRequest, "Invalid JSON payload", nil)
@@ -253,9 +262,17 @@ func (h *ProductHandler) extractIDFromPath(path string) (uint, error) {
 
 // sendJSONResponse sends a JSON response
 func (h *ProductHandler) sendJSONResponse(w http.ResponseWriter, statusCode int, data interface{}) {
+	body, err := json.Marshal(data)
+	if err != nil {
+		log.Printf("failed to marshal response: %v", err)
+		http.Error(w, "internal server error", http.StatusInternalServerError)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(data)
+	if _, err := w.Write(body); err != nil {
+		log.Printf("failed to write response: %v", err)
+	}
 }
 
 // sendErrorResponse sends an error response

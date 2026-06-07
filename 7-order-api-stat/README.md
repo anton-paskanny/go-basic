@@ -206,6 +206,7 @@ APP_DB_SSLMODE=disable
 
 ## Validation Rules
 
+- **Request body**: Maximum 1 MB
 - **name**: Required, 3-255 characters
 - **description**: Optional, max 1000 characters
 - **price**: Required, must be greater than 0

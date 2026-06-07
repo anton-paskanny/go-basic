@@ -11,9 +11,6 @@ import (
 	"order-api-stat/config"
 )
 
-// DB is a global database connection instance
-var DB *gorm.DB
-
 // Connect establishes a connection to the database
 func Connect(cfg *config.Config) (*gorm.DB, error) {
 	dsn := cfg.Database.GetDSN()
@@ -28,11 +25,5 @@ func Connect(cfg *config.Config) (*gorm.DB, error) {
 	}
 
 	log.Println("Connected to database successfully")
-	DB = db
 	return db, nil
-}
-
-// GetDB returns the database connection
-func GetDB() *gorm.DB {
-	return DB
 }
