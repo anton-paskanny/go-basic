@@ -27,13 +27,14 @@ func NewAuthServiceClient(baseURL string) *AuthServiceClient {
 }
 
 // GetUserByID fetches user data from the auth service
-func (c *AuthServiceClient) GetUserByID(userID string) (*models.ExternalUser, error) {
+func (c *AuthServiceClient) GetUserByID(userID, authToken string) (*models.ExternalUser, error) {
 	url := fmt.Sprintf("%s/users/%s", c.baseURL, userID)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("Authorization", authToken)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -54,8 +55,8 @@ func (c *AuthServiceClient) GetUserByID(userID string) (*models.ExternalUser, er
 }
 
 // ValidateUser validates that a user exists in the auth service
-func (c *AuthServiceClient) ValidateUser(userID string) error {
-	_, err := c.GetUserByID(userID)
+func (c *AuthServiceClient) ValidateUser(userID, authToken string) error {
+	_, err := c.GetUserByID(userID, authToken)
 	return err
 }
 
@@ -76,13 +77,14 @@ func NewProductServiceClient(baseURL string) *ProductServiceClient {
 }
 
 // GetProductByID fetches product data from the product service
-func (c *ProductServiceClient) GetProductByID(productID string) (*models.ExternalProduct, error) {
+func (c *ProductServiceClient) GetProductByID(productID, authToken string) (*models.ExternalProduct, error) {
 	url := fmt.Sprintf("%s/products/%s", c.baseURL, productID)
 
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
+	req.Header.Set("Authorization", authToken)
 
 	resp, err := c.client.Do(req)
 	if err != nil {
@@ -103,7 +105,7 @@ func (c *ProductServiceClient) GetProductByID(productID string) (*models.Externa
 }
 
 // UpdateProductQuantity updates product quantity in the product service
-func (c *ProductServiceClient) UpdateProductQuantity(productID string, quantityChange int) error {
+func (c *ProductServiceClient) UpdateProductQuantity(productID string, quantityChange int, authToken string) error {
 	url := fmt.Sprintf("%s/products/%s/quantity", c.baseURL, productID)
 
 	payload := map[string]int{
@@ -121,6 +123,7 @@ func (c *ProductServiceClient) UpdateProductQuantity(productID string, quantityC
 	}
 
 	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", authToken)
 
 	resp, err := c.client.Do(req)
 	if err != nil {

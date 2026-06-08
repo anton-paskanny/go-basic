@@ -29,73 +29,68 @@ func NewOrderHandler(authServiceURL, productServiceURL string) *OrderHandler {
 
 // CreateOrder handles POST /order
 func (h *OrderHandler) CreateOrder(w http.ResponseWriter, r *http.Request) {
-	// Check method
 	if r.Method != http.MethodPost {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Get user ID from context (set by auth middleware)
-	userID, ok := r.Context().Value("user_id").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
 		http.Error(w, "Unauthorized: User ID not found", http.StatusUnauthorized)
 		return
 	}
 
-	// Parse request body
+	authToken := r.Header.Get("Authorization")
+
 	var req models.OrderRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		http.Error(w, fmt.Sprintf("Invalid request body: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Validate request
 	if !middleware.ValidateStruct(w, h.validator, &req) {
 		return
 	}
 
-	// Create order
-	order, err := h.orderService.CreateOrder(userID, &req)
+	order, err := h.orderService.CreateOrder(userID, &req, authToken)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to create order: %v", err), http.StatusBadRequest)
 		return
 	}
 
-	// Set response headers
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-
-	// Write response
-	if err := json.NewEncoder(w).Encode(order); err != nil {
+	body, err := json.Marshal(order)
+	if err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
 	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+	w.Write(body)
 }
 
 // GetOrderByID handles GET /order/{id}
 func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
-	// Check method
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Extract order ID from URL path
 	path := strings.TrimPrefix(r.URL.Path, "/api/v1/order/")
 	if path == "" {
 		http.Error(w, "Order ID is required", http.StatusBadRequest)
 		return
 	}
 
-	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
 		http.Error(w, "Unauthorized: User ID not found", http.StatusUnauthorized)
 		return
 	}
 
-	// Get order
-	order, err := h.orderService.GetOrderByID(path)
+	authToken := r.Header.Get("Authorization")
+
+	order, err := h.orderService.GetOrderByID(path, authToken)
 	if err != nil {
 		if err.Error() == "order not found" {
 			http.Error(w, "Order not found", http.StatusNotFound)
@@ -105,16 +100,12 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check if the order belongs to the authenticated user
 	if order.UserID != userID {
 		http.Error(w, "You can only access your own orders", http.StatusForbidden)
 		return
 	}
 
-	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
-
-	// Write response
 	if err := json.NewEncoder(w).Encode(order); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
@@ -123,20 +114,19 @@ func (h *OrderHandler) GetOrderByID(w http.ResponseWriter, r *http.Request) {
 
 // GetMyOrders handles GET /my-orders
 func (h *OrderHandler) GetMyOrders(w http.ResponseWriter, r *http.Request) {
-	// Check method
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
-	// Get user ID from context
-	userID, ok := r.Context().Value("user_id").(string)
+	userID, ok := r.Context().Value(middleware.UserIDKey).(string)
 	if !ok {
 		http.Error(w, "Unauthorized: User ID not found", http.StatusUnauthorized)
 		return
 	}
 
-	// Get pagination parameters
+	authToken := r.Header.Get("Authorization")
+
 	pageStr := r.URL.Query().Get("page")
 	limitStr := r.URL.Query().Get("limit")
 
@@ -155,38 +145,20 @@ func (h *OrderHandler) GetMyOrders(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get orders
-	orders, err := h.orderService.GetOrdersByUserID(userID)
+	orders, total, err := h.orderService.GetOrdersByUserID(userID, page, limit, authToken)
 	if err != nil {
 		http.Error(w, fmt.Sprintf("Failed to get orders: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// Simple pagination (in a real app, you'd implement this in the service layer)
-	start := (page - 1) * limit
-	end := start + limit
-
-	if start >= len(orders) {
-		orders = []models.OrderResponse{}
-	} else {
-		if end > len(orders) {
-			end = len(orders)
-		}
-		orders = orders[start:end]
-	}
-
-	// Create response
 	response := map[string]interface{}{
 		"orders": orders,
 		"page":   page,
 		"limit":  limit,
-		"total":  len(orders),
+		"total":  total,
 	}
 
-	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
-
-	// Write response
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return
@@ -195,7 +167,6 @@ func (h *OrderHandler) GetMyOrders(w http.ResponseWriter, r *http.Request) {
 
 // HealthCheck handles GET /health
 func HealthCheck(w http.ResponseWriter, r *http.Request) {
-	// Check method
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -206,10 +177,7 @@ func HealthCheck(w http.ResponseWriter, r *http.Request) {
 		"service": "order-api-cart",
 	}
 
-	// Set response headers
 	w.Header().Set("Content-Type", "application/json")
-
-	// Write response
 	if err := json.NewEncoder(w).Encode(response); err != nil {
 		http.Error(w, "Failed to encode response", http.StatusInternalServerError)
 		return

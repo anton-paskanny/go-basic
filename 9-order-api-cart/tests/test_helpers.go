@@ -2,14 +2,18 @@ package tests
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
 	"order-api-cart/models"
 
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 )
@@ -108,7 +112,9 @@ func (m *MockProductService) UpdateProductQuantity(productID string, quantityCha
 	return nil
 }
 
-// StartMockAuthService starts a mock auth service server
+// StartMockAuthService starts a mock auth service server and registers a
+// cleanup that shuts it down when the test ends, freeing the port for the
+// next test.
 func StartMockAuthService(t *testing.T, port string) *MockAuthService {
 	mock := NewMockAuthService()
 
@@ -119,7 +125,6 @@ func StartMockAuthService(t *testing.T, port string) *MockAuthService {
 			return
 		}
 
-		// Extract user ID from URL
 		userID := r.URL.Path[len("/users/"):]
 		if userID == "" {
 			http.Error(w, "User ID required", http.StatusBadRequest)
@@ -136,47 +141,51 @@ func StartMockAuthService(t *testing.T, port string) *MockAuthService {
 		json.NewEncoder(w).Encode(user)
 	})
 
+	server := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
-		if err := http.ListenAndServe(":"+port, mux); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			t.Logf("Mock auth service error: %v", err)
 		}
 	}()
+	t.Cleanup(func() { server.Shutdown(context.Background()) })
 
-	// Wait a bit for server to start
 	time.Sleep(100 * time.Millisecond)
 	return mock
 }
 
-// StartMockProductService starts a mock product service server
+// StartMockProductService starts a mock product service server and registers a
+// cleanup that shuts it down when the test ends, freeing the port for the
+// next test.
 func StartMockProductService(t *testing.T, port string) *MockProductService {
 	mock := NewMockProductService()
 
 	mux := http.NewServeMux()
 	mux.HandleFunc("/products/", func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == http.MethodGet {
-			// Extract product ID from URL
-			productID := r.URL.Path[len("/products/"):]
-			if productID == "" {
-				http.Error(w, "Product ID required", http.StatusBadRequest)
-				return
-			}
+		// Strip the "/products/" prefix, then split off any sub-path (e.g. "/quantity")
+		rest := r.URL.Path[len("/products/"):]
+		parts := strings.SplitN(rest, "/", 2)
+		productID := parts[0]
+		subpath := ""
+		if len(parts) == 2 {
+			subpath = parts[1]
+		}
 
+		if productID == "" {
+			http.Error(w, "Product ID required", http.StatusBadRequest)
+			return
+		}
+
+		switch {
+		case r.Method == http.MethodGet && subpath == "":
 			product, err := mock.GetProductByID(productID)
 			if err != nil {
 				http.Error(w, "Product not found", http.StatusNotFound)
 				return
 			}
-
 			w.Header().Set("Content-Type", "application/json")
 			json.NewEncoder(w).Encode(product)
-		} else if r.Method == http.MethodPatch {
-			// Handle quantity update
-			productID := r.URL.Path[len("/products/"):]
-			if productID == "" {
-				http.Error(w, "Product ID required", http.StatusBadRequest)
-				return
-			}
 
+		case r.Method == http.MethodPatch && subpath == "quantity":
 			var req struct {
 				Change int `json:"change"`
 			}
@@ -184,34 +193,46 @@ func StartMockProductService(t *testing.T, port string) *MockProductService {
 				http.Error(w, "Invalid request body", http.StatusBadRequest)
 				return
 			}
-
 			if err := mock.UpdateProductQuantity(productID, req.Change); err != nil {
 				http.Error(w, err.Error(), http.StatusBadRequest)
 				return
 			}
-
 			w.WriteHeader(http.StatusOK)
-		} else {
+
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
 
+	server := &http.Server{Addr: ":" + port, Handler: mux}
 	go func() {
-		if err := http.ListenAndServe(":"+port, mux); err != nil {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			t.Logf("Mock product service error: %v", err)
 		}
 	}()
+	t.Cleanup(func() { server.Shutdown(context.Background()) })
 
-	// Wait a bit for server to start
 	time.Sleep(100 * time.Millisecond)
 	return mock
 }
 
-// GenerateTestJWT generates a test JWT token
+// GenerateTestJWT generates a signed JWT token for testing.
+// It reads JWT_SECRET from the environment (falls back to "test-secret-key")
+// so the token is accepted by the auth middleware.
 func GenerateTestJWT(userID string) string {
-	// For testing purposes, we'll create a simple token
-	// In a real scenario, you'd use the actual JWT service
-	return fmt.Sprintf("test-token-%s", userID)
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "test-secret-key"
+	}
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"user_id": userID,
+		"exp":     time.Now().Add(24 * time.Hour).Unix(),
+	})
+	tokenString, err := token.SignedString([]byte(secret))
+	if err != nil {
+		panic(fmt.Sprintf("failed to generate test JWT: %v", err))
+	}
+	return tokenString
 }
 
 // CreateTestOrderRequest creates a test order request

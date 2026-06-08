@@ -222,10 +222,10 @@ ENVIRONMENT=development
 
 ### .env File Support
 
-Create a `.env` file in the project root (copy from `env.template`):
+Create a `.env` file in the project root (copy from `.env.example`):
 
 ```bash
-cp env.template .env
+cp .env.example .env
 # Edit .env with your configuration
 ```
 
@@ -237,7 +237,7 @@ The service will automatically load variables from `.env` file if it exists, oth
 
 1. Copy environment template:
 ```bash
-cp env.template .env
+cp .env.example .env
 # Edit .env with your configuration
 ```
 
@@ -261,7 +261,7 @@ docker-compose logs -f order-api-cart
 1. Install PostgreSQL and create a database
 2. Copy environment template:
 ```bash
-cp env.template .env
+cp .env.example .env
 # Edit .env with your configuration
 ```
 3. Install dependencies:
@@ -521,19 +521,26 @@ Common HTTP status codes:
 ## Business Logic
 
 ### Order Creation
-1. Validates user authentication
-2. Validates user exists in auth service
-3. Checks product availability and quantity via product service
-4. Creates order and order items in a transaction
-5. Updates product quantity via product service API
+1. Validates user authentication (JWT checked by middleware)
+2. Validates user exists in auth service (forwarding the `Authorization` header)
+3. Pre-fetches all products and checks availability via product service (outside the DB transaction)
+4. Creates order and order items in a DB-only transaction
+5. After a successful commit, decrements product quantities via the product service
 6. Calculates and sets order total
 
 ### Quantity Management
-- Product quantity is automatically decremented via product service API
-- Insufficient quantity prevents order creation
-- Quantity updates are handled by the product service
+- Product quantities are pre-validated before the transaction opens, so a DB rollback never leaves a partially-decremented inventory in the product service
+- Inventory is decremented only after the DB transaction commits successfully
+- **Known limitation**: there is a TOCTOU window between the pre-fetch quantity check and the post-commit decrement. Two concurrent orders for the same product could both pass the availability check and then both decrement. A full solution requires a saga or outbox pattern.
+- If a post-commit quantity update fails, the order is already persisted; a `WARNING` log is emitted so the discrepancy can be reconciled manually.
+
+### Pagination
+- `GET /api/v1/my-orders` paginates at the database level (`COUNT` + `OFFSET`/`LIMIT`) rather than loading all rows into memory. The `total` field in the response reflects the full count of the user's orders.
+
+### Auth Token Propagation
+- The `Authorization` header from the incoming request is forwarded to all downstream service calls (auth service user validation, product service lookups and quantity updates).
 
 ### User Authorization
 - Users can only access their own orders
-- JWT tokens must contain valid `user_id` claim
+- JWT tokens must contain a valid `user_id` claim
 - All order operations require authentication

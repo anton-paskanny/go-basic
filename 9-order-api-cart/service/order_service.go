@@ -3,11 +3,13 @@ package service
 import (
 	"errors"
 	"fmt"
+	"log"
 
 	"order-api-cart/clients"
 	"order-api-cart/database"
 	"order-api-cart/models"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -27,14 +29,39 @@ func NewOrderService(authServiceURL, productServiceURL string) *OrderService {
 	}
 }
 
-// CreateOrder creates a new order
-func (s *OrderService) CreateOrder(userID string, req *models.OrderRequest) (*models.OrderResponse, error) {
+// CreateOrder creates a new order.
+//
+// Design note: all external HTTP calls (auth + product) are made outside the
+// DB transaction so that a transaction rollback never leaves partially-decremented
+// inventory in the product service. Inventory is decremented only after the DB
+// transaction commits successfully.
+func (s *OrderService) CreateOrder(userID string, req *models.OrderRequest, authToken string) (*models.OrderResponse, error) {
 	// Validate user exists in auth service
-	if err := s.authClient.ValidateUser(userID); err != nil {
+	if err := s.authClient.ValidateUser(userID, authToken); err != nil {
 		return nil, fmt.Errorf("user validation failed: %w", err)
 	}
 
-	// Start a transaction
+	// Pre-fetch all products and validate quantities before opening a transaction.
+	// Keeping external calls outside the transaction prevents inventory from being
+	// decremented in the product service when the DB transaction later rolls back.
+	type itemData struct {
+		req     models.OrderItemRequest
+		product *models.ExternalProduct
+	}
+	itemsData := make([]itemData, 0, len(req.Items))
+	for _, itemReq := range req.Items {
+		product, err := s.productClient.GetProductByID(itemReq.ProductID, authToken)
+		if err != nil {
+			return nil, fmt.Errorf("product not found: %s", itemReq.ProductID)
+		}
+		if product.Quantity < itemReq.Quantity {
+			return nil, fmt.Errorf("insufficient quantity for product %s. Available: %d, Requested: %d",
+				product.Name, product.Quantity, itemReq.Quantity)
+		}
+		itemsData = append(itemsData, itemData{req: itemReq, product: product})
+	}
+
+	// DB-only transaction — no external service calls inside
 	tx := s.db.Begin()
 	defer func() {
 		if r := recover(); r != nil {
@@ -42,82 +69,66 @@ func (s *OrderService) CreateOrder(userID string, req *models.OrderRequest) (*mo
 		}
 	}()
 
-	// Create the order
 	order := &models.Order{
 		UserID: userID,
 		Status: "pending",
 		Total:  0,
 	}
-
 	if err := tx.Create(order).Error; err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("failed to create order: %w", err)
 	}
 
 	var total float64
-	var orderItems []models.OrderItem
-
-	// Process each item in the order
-	for _, itemReq := range req.Items {
-		// Get product details from product service
-		product, err := s.productClient.GetProductByID(itemReq.ProductID)
-		if err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("product not found: %s", itemReq.ProductID)
-		}
-
-		// Check quantity availability
-		if product.Quantity < itemReq.Quantity {
-			tx.Rollback()
-			return nil, fmt.Errorf("insufficient quantity for product %s. Available: %d, Requested: %d",
-				product.Name, product.Quantity, itemReq.Quantity)
-		}
-
-		// Create order item
+	for _, item := range itemsData {
 		orderItem := models.OrderItem{
 			OrderID:   order.ID,
-			ProductID: itemReq.ProductID,
-			Quantity:  itemReq.Quantity,
-			Price:     product.Price,
+			ProductID: item.req.ProductID,
+			Quantity:  item.req.Quantity,
+			Price:     item.product.Price,
 		}
-
 		if err := tx.Create(&orderItem).Error; err != nil {
 			tx.Rollback()
 			return nil, fmt.Errorf("failed to create order item: %w", err)
 		}
-
-		// Update product quantity in product service
-		if err := s.productClient.UpdateProductQuantity(itemReq.ProductID, -itemReq.Quantity); err != nil {
-			tx.Rollback()
-			return nil, fmt.Errorf("failed to update product quantity: %w", err)
-		}
-
-		orderItems = append(orderItems, orderItem)
-		total += product.Price * float64(itemReq.Quantity)
+		total += item.product.Price * float64(item.req.Quantity)
 	}
 
-	// Update order total
 	if err := tx.Model(order).Update("total", total).Error; err != nil {
 		tx.Rollback()
 		return nil, fmt.Errorf("failed to update order total: %w", err)
 	}
 
-	// Commit transaction
 	if err := tx.Commit().Error; err != nil {
+		tx.Rollback()
 		return nil, fmt.Errorf("failed to commit transaction: %w", err)
 	}
 
-	// Load order with items for response
+	// Decrement inventory after a successful DB commit.
+	// If an update fails at this point the order is already persisted; log a
+	// warning so ops can reconcile manually. A full solution would use a saga
+	// or an outbox pattern.
+	for _, item := range itemsData {
+		if err := s.productClient.UpdateProductQuantity(item.req.ProductID, -item.req.Quantity, authToken); err != nil {
+			log.Printf("WARNING: inventory update failed for product %s after order %s was committed: %v",
+				item.req.ProductID, order.ID, err)
+		}
+	}
+
 	var orderWithItems models.Order
 	if err := s.db.Preload("OrderItems").First(&orderWithItems, "id = ?", order.ID).Error; err != nil {
 		return nil, fmt.Errorf("failed to load order: %w", err)
 	}
 
-	return s.orderToResponse(&orderWithItems), nil
+	return s.orderToResponse(&orderWithItems, authToken), nil
 }
 
 // GetOrderByID retrieves an order by ID
-func (s *OrderService) GetOrderByID(orderID string) (*models.OrderResponse, error) {
+func (s *OrderService) GetOrderByID(orderID, authToken string) (*models.OrderResponse, error) {
+	if _, err := uuid.Parse(orderID); err != nil {
+		return nil, errors.New("order not found")
+	}
+
 	var order models.Order
 
 	if err := s.db.Preload("OrderItems").First(&order, "id = ?", orderID).Error; err != nil {
@@ -127,34 +138,43 @@ func (s *OrderService) GetOrderByID(orderID string) (*models.OrderResponse, erro
 		return nil, fmt.Errorf("failed to get order: %w", err)
 	}
 
-	return s.orderToResponse(&order), nil
+	return s.orderToResponse(&order, authToken), nil
 }
 
-// GetOrdersByUserID retrieves all orders for a specific user
-func (s *OrderService) GetOrdersByUserID(userID string) ([]models.OrderResponse, error) {
+// GetOrdersByUserID retrieves paginated orders for a user.
+// Pagination is performed at the DB level to avoid loading all orders into memory.
+func (s *OrderService) GetOrdersByUserID(userID string, page, limit int, authToken string) ([]models.OrderResponse, int64, error) {
+	var total int64
+	if err := s.db.Model(&models.Order{}).Where("user_id = ?", userID).Count(&total).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to count user orders: %w", err)
+	}
+
 	var orders []models.Order
-
-	if err := s.db.Preload("OrderItems").Where("user_id = ?", userID).Find(&orders).Error; err != nil {
-		return nil, fmt.Errorf("failed to get user orders: %w", err)
+	offset := (page - 1) * limit
+	if err := s.db.Preload("OrderItems").Where("user_id = ?", userID).
+		Offset(offset).Limit(limit).Find(&orders).Error; err != nil {
+		return nil, 0, fmt.Errorf("failed to get user orders: %w", err)
 	}
 
-	var responses []models.OrderResponse
+	responses := make([]models.OrderResponse, 0, len(orders))
 	for _, order := range orders {
-		responses = append(responses, *s.orderToResponse(&order))
+		responses = append(responses, *s.orderToResponse(&order, authToken))
 	}
 
-	return responses, nil
+	return responses, total, nil
 }
 
-// orderToResponse converts Order model to OrderResponse
-func (s *OrderService) orderToResponse(order *models.Order) *models.OrderResponse {
+// orderToResponse converts an Order model to an OrderResponse, enriching each
+// item with product details from the product service. If a product fetch fails,
+// a stub is used and a warning is logged rather than failing the whole request.
+func (s *OrderService) orderToResponse(order *models.Order, authToken string) *models.OrderResponse {
 	var items []models.OrderItemResponse
 
 	for _, item := range order.OrderItems {
-		// Fetch product details for each item
-		product, err := s.productClient.GetProductByID(item.ProductID)
+		product, err := s.productClient.GetProductByID(item.ProductID, authToken)
 		if err != nil {
-			// If product fetch fails, create a minimal product response
+			log.Printf("WARNING: failed to fetch product %s for order %s response: %v",
+				item.ProductID, order.ID, err)
 			product = &models.ExternalProduct{
 				ID:    item.ProductID,
 				Name:  "Product not available",
